@@ -295,6 +295,7 @@ button, input, select { font-family: inherit; }
   font-size: 12.5px;
   cursor: pointer;
   white-space: nowrap;
+  position: relative;
 }
 
 .tab-pill:hover {
@@ -305,6 +306,29 @@ button, input, select { font-family: inherit; }
   background: var(--sidebar-bg);
   color: var(--text);
   font-weight: 500;
+}
+
+.tab-pill.dragging {
+  opacity: .4;
+}
+
+.tab-pill.drop-before::before,
+.tab-pill.drop-after::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  background: var(--accent);
+  border-radius: 1px;
+}
+
+.tab-pill.drop-before::before {
+  left: -1px;
+}
+
+.tab-pill.drop-after::after {
+  right: -1px;
 }
 
 .tab-pill-name {
@@ -340,6 +364,13 @@ button, input, select { font-family: inherit; }
   display: flex;
   align-items: center;
   justify-content: center;
+  opacity: 0;
+  transition: opacity .1s ease;
+}
+
+.tab-pill:hover .tab-pill-close,
+.tab-pill.active .tab-pill-close {
+  opacity: 1;
 }
 
 .tab-pill-close:hover {

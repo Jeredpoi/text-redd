@@ -111,12 +111,19 @@ function applyDefaultFont() {
   document.getElementById('fontSize').value = settings.defaultFontSize;
 }
 
+let dragTabId = null;
+
+function clearDropIndicators() {
+  tabListEl.querySelectorAll('.tab-pill').forEach((p) => p.classList.remove('drop-before', 'drop-after'));
+}
+
 function renderTabBar() {
   tabListEl.innerHTML = '';
   tabs.forEach((tab) => {
     const pill = document.createElement('div');
     pill.className = 'tab-pill' + (tab.id === activeTabId ? ' active' : '') + (tab.isDirty ? ' dirty' : '');
     pill.title = tab.filePath || tab.fileName;
+    pill.draggable = true;
 
     const name = document.createElement('span');
     name.className = 'tab-pill-name';
@@ -137,8 +144,69 @@ function renderTabBar() {
     pill.appendChild(dot);
     pill.appendChild(closeBtn);
     pill.addEventListener('click', () => switchToTab(tab.id));
+
+    // Средний клик закрывает вкладку, как во всех браузерах
+    pill.addEventListener('auxclick', (e) => {
+      if (e.button === 1) {
+        e.preventDefault();
+        closeTab(tab.id);
+      }
+    });
+
+    // Перетаскивание для смены порядка вкладок
+    pill.addEventListener('dragstart', (e) => {
+      dragTabId = tab.id;
+      pill.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      try { e.dataTransfer.setData('text/plain', String(tab.id)); } catch (err) {}
+    });
+    pill.addEventListener('dragend', () => {
+      pill.classList.remove('dragging');
+      clearDropIndicators();
+      dragTabId = null;
+    });
+    pill.addEventListener('dragover', (e) => {
+      if (dragTabId === null || dragTabId === tab.id) return;
+      e.preventDefault();
+      const rect = pill.getBoundingClientRect();
+      const before = e.clientX - rect.left < rect.width / 2;
+      pill.classList.toggle('drop-before', before);
+      pill.classList.toggle('drop-after', !before);
+    });
+    pill.addEventListener('dragleave', () => {
+      pill.classList.remove('drop-before', 'drop-after');
+    });
+    pill.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const before = e.clientX - pill.getBoundingClientRect().left < pill.getBoundingClientRect().width / 2;
+      clearDropIndicators();
+      if (dragTabId === null || dragTabId === tab.id) return;
+      const fromIdx = tabs.findIndex((t) => t.id === dragTabId);
+      if (fromIdx === -1) return;
+      const [moved] = tabs.splice(fromIdx, 1);
+      const toIdx = tabs.findIndex((t) => t.id === tab.id);
+      tabs.splice(before ? toIdx : toIdx + 1, 0, moved);
+      renderTabBar();
+    });
+
     tabListEl.appendChild(pill);
   });
+}
+
+function cycleTab(delta) {
+  if (tabs.length === 0) return;
+  const idx = tabs.findIndex((t) => t.id === activeTabId);
+  const next = (idx + delta + tabs.length) % tabs.length;
+  switchToTab(tabs[next].id);
+}
+
+function jumpToTab(n) {
+  if (tabs.length === 0) return;
+  if (n === 9) {
+    switchToTab(tabs[tabs.length - 1].id);
+    return;
+  }
+  if (tabs[n - 1]) switchToTab(tabs[n - 1].id);
 }
 
 function switchToTab(id) {
@@ -989,6 +1057,9 @@ document.addEventListener('keydown', (e) => {
   if (mod && key === 's') { e.preventDefault(); saveActiveTab(); return; }
   if (mod && key === 'p') { e.preventDefault(); window.api.print(); return; }
   if (mod && key === 'w') { e.preventDefault(); closeTab(activeTabId); return; }
+  if (mod && e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); cycleTab(1); return; }
+  if (mod && e.key === 'Tab' && e.shiftKey) { e.preventDefault(); cycleTab(-1); return; }
+  if (mod && /^[1-9]$/.test(e.key)) { e.preventDefault(); jumpToTab(parseInt(e.key, 10)); return; }
   if (mod && key === 'f') { e.preventDefault(); openFindBar(); return; }
   if (mod && key === 'k') { e.preventDefault(); document.getElementById('btnLink').click(); return; }
   if (mod && e.key === '\\') { e.preventDefault(); editor.focus(); document.execCommand('removeFormat'); markActiveDirty(); return; }
