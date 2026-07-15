@@ -1,0 +1,26 @@
+const { contextBridge, ipcRenderer } = require('electron');
+
+contextBridge.exposeInMainWorld('api', {
+  openFile: () => ipcRenderer.invoke('dialog-open'),
+  openPath: (p) => ipcRenderer.invoke('open-path', p),
+  saveAs: (html) => ipcRenderer.invoke('dialog-save-as', html),
+  save: (html) => ipcRenderer.invoke('save-current', html),
+  exportPdf: (html) => ipcRenderer.invoke('export-pdf', html),
+  exportDocx: (html) => ipcRenderer.invoke('export-docx', html),
+  insertImageDialog: () => ipcRenderer.invoke('insert-image-dialog'),
+  setDirty: (dirty) => ipcRenderer.invoke('dirty-state', dirty),
+
+  onMenuNew: (cb) => ipcRenderer.on('menu-new', cb),
+  onMenuOpen: (cb) => ipcRenderer.on('menu-open', cb),
+  onMenuOpenPath: (cb) => ipcRenderer.on('menu-open-path', (e, p) => cb(p)),
+  onMenuSave: (cb) => ipcRenderer.on('menu-save', cb),
+  onMenuSaveAs: (cb) => ipcRenderer.on('menu-save-as', cb),
+  onMenuExportPdf: (cb) => ipcRenderer.on('menu-export-pdf', cb),
+  onMenuExportDocx: (cb) => ipcRenderer.on('menu-export-docx', cb),
+  onMenuFind: (cb) => ipcRenderer.on('menu-find', cb),
+  onMenuToggleTheme: (cb) => ipcRenderer.on('menu-toggle-theme', cb),
+  onMenuInsertTable: (cb) => ipcRenderer.on('menu-insert-table', cb),
+  onMenuInsertLink: (cb) => ipcRenderer.on('menu-insert-link', cb),
+  onMenuInsertImage: (cb) => ipcRenderer.on('menu-insert-image', cb),
+  onMenuInsertHr: (cb) => ipcRenderer.on('menu-insert-hr', cb),
+});

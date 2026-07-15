@@ -1,0 +1,56 @@
+{
+  "name": "prostoy-redaktor",
+  "productName": "Простой Редактор",
+  "version": "1.0.0",
+  "description": "Текстовый редактор с богатым форматированием и проверкой орфографии (RU/EN)",
+  "main": "main.js",
+  "author": "Максим",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis",
+    "pack": "electron-builder --dir"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "dependencies": {
+    "html-to-docx": "^1.8.0"
+  },
+  "build": {
+    "appId": "com.maxim.prostoyredaktor",
+    "productName": "Простой Редактор",
+    "asar": true,
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "renderer.js",
+      "styles.css",
+      "node_modules/**/*"
+    ],
+    "directories": {
+      "output": "dist_installer",
+      "buildResources": "build"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Простой Редактор",
+      "language": "1049"
+    }
+  }
+}

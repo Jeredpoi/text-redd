@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<title>Простой Редактор</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="toolbar">
+    <select id="fontName" title="Шрифт">
+      <option value="Calibri">Calibri</option>
+      <option value="Arial">Arial</option>
+      <option value="Georgia">Georgia</option>
+      <option value="Times New Roman">Times New Roman</option>
+      <option value="Courier New">Courier New</option>
+      <option value="Verdana">Verdana</option>
+    </select>
+    <select id="fontSize" title="Размер шрифта">
+      <option value="1">8</option>
+      <option value="2">10</option>
+      <option value="3" selected>12</option>
+      <option value="4">14</option>
+      <option value="5">18</option>
+      <option value="6">24</option>
+      <option value="7">36</option>
+    </select>
+    <span class="sep"></span>
+    <select id="blockFormat" title="Стиль абзаца">
+      <option value="p">Обычный текст</option>
+      <option value="h1">Заголовок 1</option>
+      <option value="h2">Заголовок 2</option>
+      <option value="h3">Заголовок 3</option>
+      <option value="blockquote">Цитата</option>
+      <option value="pre">Код</option>
+    </select>
+    <span class="sep"></span>
+    <button data-cmd="bold" title="Жирный (Ctrl+B)"><b>Ж</b></button>
+    <button data-cmd="italic" title="Курсив (Ctrl+I)"><i>К</i></button>
+    <button data-cmd="underline" title="Подчёркнутый (Ctrl+U)"><u>Ч</u></button>
+    <button data-cmd="strikeThrough" title="Зачёркнутый"><s>Ы</s></button>
+    <span class="sep"></span>
+    <input type="color" id="foreColor" title="Цвет текста" value="#000000" />
+    <input type="color" id="hiliteColor" title="Цвет выделения" value="#ffff00" />
+    <span class="sep"></span>
+    <button data-cmd="justifyLeft" title="По левому краю">⯇</button>
+    <button data-cmd="justifyCenter" title="По центру">☰</button>
+    <button data-cmd="justifyRight" title="По правому краю">⯈</button>
+    <button data-cmd="justifyFull" title="По ширине">▤</button>
+    <span class="sep"></span>
+    <button data-cmd="insertUnorderedList" title="Маркированный список">• —</button>
+    <button data-cmd="insertOrderedList" title="Нумерованный список">1.—</button>
+    <button data-cmd="outdent" title="Уменьшить отступ">⇤</button>
+    <button data-cmd="indent" title="Увеличить отступ">⇥</button>
+    <span class="sep"></span>
+    <button id="btnTable" title="Вставить таблицу">▦</button>
+    <button id="btnLink" title="Вставить ссылку">🔗</button>
+    <button id="btnImage" title="Вставить изображение">🖼</button>
+    <button id="btnHr" title="Горизонтальная линия">—</button>
+    <span class="sep"></span>
+    <button data-cmd="removeFormat" title="Очистить форматирование">✕</button>
+  </div>
+
+  <div id="findBar" class="hidden">
+    <input type="text" id="findInput" placeholder="Найти…" />
+    <input type="text" id="replaceInput" placeholder="Заменить на…" />
+    <button id="findNextBtn">Найти далее</button>
+    <button id="replaceBtn">Заменить</button>
+    <button id="replaceAllBtn">Заменить всё</button>
+    <button id="closeFindBtn">✕</button>
+  </div>
+
+  <div id="editorWrap">
+    <div id="editor" contenteditable="true" spellcheck="true"></div>
+  </div>
+
+  <div id="statusBar">
+    <span id="fileName">Без имени</span>
+    <span id="stats">Слов: 0 · Символов: 0</span>
+    <span id="savedState">Сохранено</span>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

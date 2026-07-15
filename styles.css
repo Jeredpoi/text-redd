@@ -1,0 +1,192 @@
+:root {
+  --bg: #f4f4f6;
+  --toolbar-bg: #e7e8ec;
+  --border: #cfcfd6;
+  --text: #1a1a1e;
+  --editor-bg: #ffffff;
+  --btn-hover: #d7d8de;
+  --btn-active: #b9c3ff;
+  --status-bg: #e7e8ec;
+  --accent: #4a63e7;
+}
+
+body.dark {
+  --bg: #1e1f24;
+  --toolbar-bg: #26272e;
+  --border: #34353d;
+  --text: #e6e6ea;
+  --editor-bg: #202126;
+  --btn-hover: #34353d;
+  --btn-active: #3a4b9e;
+  --status-bg: #26272e;
+  --accent: #7c93ff;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+#toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  background: var(--toolbar-bg);
+  border-bottom: 1px solid var(--border);
+}
+
+#toolbar button {
+  min-width: 30px;
+  height: 30px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 14px;
+}
+
+#toolbar button:hover {
+  background: var(--btn-hover);
+}
+
+#toolbar button.active {
+  background: var(--btn-active);
+}
+
+#toolbar select, #toolbar input[type="color"] {
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--editor-bg);
+  color: var(--text);
+}
+
+#toolbar input[type="color"] {
+  width: 34px;
+  padding: 2px;
+  cursor: pointer;
+}
+
+.sep {
+  width: 1px;
+  height: 22px;
+  background: var(--border);
+  margin: 0 4px;
+}
+
+#findBar {
+  display: flex;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--toolbar-bg);
+  border-bottom: 1px solid var(--border);
+}
+
+#findBar.hidden {
+  display: none;
+}
+
+#findBar input {
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--editor-bg);
+  color: var(--text);
+}
+
+#findBar button {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--editor-bg);
+  color: var(--text);
+  cursor: pointer;
+  padding: 4px 10px;
+}
+
+#findBar button:hover {
+  background: var(--btn-hover);
+}
+
+#editorWrap {
+  height: calc(100vh - 44px - 26px);
+  overflow-y: auto;
+  display: flex;
+  justify-content: center;
+  padding: 24px;
+}
+
+#findBar ~ #editorWrap {
+  height: calc(100vh - 44px - 26px - 42px);
+}
+
+#editor {
+  background: var(--editor-bg);
+  width: 100%;
+  max-width: 900px;
+  min-height: 1000px;
+  padding: 60px 70px;
+  outline: none;
+  line-height: 1.6;
+  font-size: 15px;
+  box-shadow: 0 0 0 1px var(--border);
+  border-radius: 2px;
+}
+
+#editor table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 10px 0;
+}
+
+#editor table td {
+  border: 1px solid #999;
+  padding: 6px 8px;
+  min-width: 40px;
+}
+
+#editor blockquote {
+  border-left: 3px solid var(--accent);
+  margin: 8px 0;
+  padding: 4px 16px;
+  color: #6a6a6a;
+}
+
+#editor pre {
+  background: #f0f0f2;
+  padding: 10px;
+  border-radius: 4px;
+  overflow-x: auto;
+  font-family: 'Consolas', monospace;
+}
+
+body.dark #editor pre {
+  background: #16171b;
+}
+
+#editor img {
+  max-width: 100%;
+}
+
+#statusBar {
+  height: 26px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 0 12px;
+  background: var(--status-bg);
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text);
+}
+
+#savedState {
+  margin-left: auto;
+}
