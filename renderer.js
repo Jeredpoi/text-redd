@@ -90,7 +90,7 @@ function loadTabIntoDOM(tab) {
 function updateWindowTitle() {
   const tab = getActiveTab();
   if (!tab) return;
-  window.api.setWindowTitle(`${tab.isDirty ? '* ' : ''}${tab.fileName} — Простой Редактор`);
+  window.api.setWindowTitle(`${tab.isDirty ? '* ' : ''}${tab.fileName} — Литера`);
 }
 
 function markActiveDirty() {

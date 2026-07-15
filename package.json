@@ -1,6 +1,6 @@
 {
-  "name": "prostoy-redaktor",
-  "productName": "Простой Редактор",
+  "name": "litera",
+  "productName": "Литера",
   "version": "1.0.0",
   "description": "Текстовый редактор с богатым форматированием и проверкой орфографии (RU/EN)",
   "main": "main.js",
@@ -19,8 +19,8 @@
     "html-to-docx": "^1.8.0"
   },
   "build": {
-    "appId": "com.maxim.prostoyredaktor",
-    "productName": "Простой Редактор",
+    "appId": "com.maxim.litera",
+    "productName": "Литера",
     "asar": true,
     "files": [
       "main.js",
@@ -49,7 +49,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Простой Редактор",
+      "shortcutName": "Литера",
       "language": "1049"
     }
   }

@@ -110,15 +110,7 @@ button, input, select { font-family: inherit; }
 #logoDot {
   width: 28px;
   height: 28px;
-  border-radius: 7px;
-  background: var(--accent);
-  color: #fff;
   flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  font-weight: 700;
 }
 
 #appName {
