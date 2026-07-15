@@ -16,7 +16,8 @@
     "electron-builder": "^24.13.3"
   },
   "dependencies": {
-    "html-to-docx": "^1.8.0"
+    "html-to-docx": "^1.8.0",
+    "mammoth": "^1.7.2"
   },
   "build": {
     "appId": "com.maxim.litera",

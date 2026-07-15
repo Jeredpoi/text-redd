@@ -20,8 +20,11 @@ contextBridge.exposeInMainWorld('api', {
 
   getSettings: () => ipcRenderer.invoke('get-settings'),
   saveSettings: (s) => ipcRenderer.invoke('save-settings', s),
+  chooseFolder: () => ipcRenderer.invoke('choose-folder'),
 
   getRecentFiles: () => ipcRenderer.invoke('get-recent-files'),
+  showRecentItemMenu: (filePath) => ipcRenderer.invoke('show-recent-item-menu', filePath),
+  showTabContextMenu: (tabId) => ipcRenderer.invoke('show-tab-context-menu', tabId),
 
   autosaveTab: (data) => ipcRenderer.invoke('autosave-tab', data),
   clearRecovery: (id) => ipcRenderer.invoke('clear-recovery', id),
@@ -31,4 +34,8 @@ contextBridge.exposeInMainWorld('api', {
   onRecentFilesChanged: (cb) => ipcRenderer.on('recent-files-changed', cb),
   onCloseRequested: (cb) => ipcRenderer.on('app-close-requested', cb),
   onTriggerInsertLink: (cb) => ipcRenderer.on('trigger-insert-link', cb),
+  onOpenRecentPath: (cb) => ipcRenderer.on('open-recent-path', (e, p) => cb(p)),
+  onTabMenuNew: (cb) => ipcRenderer.on('tab-menu-new', cb),
+  onTabMenuClose: (cb) => ipcRenderer.on('tab-menu-close', (e, id) => cb(id)),
+  onTabMenuCloseOthers: (cb) => ipcRenderer.on('tab-menu-close-others', (e, id) => cb(id)),
 });

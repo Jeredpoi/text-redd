@@ -119,15 +119,25 @@
           <option value="Times New Roman">Times New Roman</option>
           <option value="Trebuchet MS">Trebuchet MS</option>
         </select>
-        <select id="fontSize" title="Размер шрифта">
-          <option value="1">8</option>
-          <option value="2">10</option>
-          <option value="3" selected>12</option>
-          <option value="4">14</option>
-          <option value="5">18</option>
-          <option value="6">24</option>
-          <option value="7">36</option>
-        </select>
+        <input type="number" id="fontSize" list="fontSizePresets" min="1" max="400" value="12" title="Размер шрифта" />
+        <datalist id="fontSizePresets">
+          <option value="8"></option>
+          <option value="9"></option>
+          <option value="10"></option>
+          <option value="11"></option>
+          <option value="12"></option>
+          <option value="14"></option>
+          <option value="16"></option>
+          <option value="18"></option>
+          <option value="20"></option>
+          <option value="22"></option>
+          <option value="24"></option>
+          <option value="26"></option>
+          <option value="28"></option>
+          <option value="36"></option>
+          <option value="48"></option>
+          <option value="72"></option>
+        </datalist>
         <span class="sep"></span>
         <select id="blockFormat" title="Стиль абзаца">
           <option value="p">Обычный текст</option>
@@ -376,15 +386,7 @@
           </select>
         </label>
         <label class="settings-row">Размер по умолчанию
-          <select id="settingsFontSize">
-            <option value="1">8</option>
-            <option value="2">10</option>
-            <option value="3">12</option>
-            <option value="4">14</option>
-            <option value="5">18</option>
-            <option value="6">24</option>
-            <option value="7">36</option>
-          </select>
+          <input type="number" id="settingsFontSize" list="fontSizePresets" min="1" max="400" />
         </label>
       </div>
 
@@ -413,10 +415,18 @@
         <div class="settings-section-title">Файлы</div>
         <label class="settings-row">Формат сохранения по умолчанию
           <select id="settingsSaveFormat">
+            <option value="docx">Word документ (.docx)</option>
             <option value="txt">Текстовый файл (.txt)</option>
             <option value="html">HTML документ (.html)</option>
           </select>
         </label>
+        <div class="settings-row">Папка по умолчанию
+          <div class="folder-picker">
+            <span id="settingsFolderPath" class="folder-picker-path">Не выбрана</span>
+            <button id="settingsChooseFolderBtn" class="btn-secondary" type="button">Обзор…</button>
+          </div>
+        </div>
+        <div class="settings-hint">Если папка выбрана, новые документы сохраняются в неё автоматически, без диалога «Сохранить как».</div>
       </div>
 
       <div class="settings-about">Литера · версия 1.0.0</div>

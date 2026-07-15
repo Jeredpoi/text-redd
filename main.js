@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, dialog, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, dialog, ipcMain, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -9,12 +9,13 @@ const settingsPath = () => path.join(app.getPath('userData'), 'settings.json');
 const defaultSettings = {
   theme: 'dark',
   defaultFontName: 'Calibri',
-  defaultFontSize: '3',
+  defaultFontSize: 12,
   autosaveEnabled: true,
   autosaveIntervalSec: 20,
   spellcheckRu: true,
   spellcheckEn: true,
-  defaultSaveFormat: 'txt',
+  defaultSaveFormat: 'docx',
+  defaultSaveFolder: '',
 };
 
 function loadSettings() {
@@ -73,11 +74,21 @@ function saveRecentFiles(list) {
   } catch (e) {}
 }
 
+function broadcastRecentFilesChanged() {
+  BrowserWindow.getAllWindows().forEach((w) => w.webContents.send('recent-files-changed'));
+}
+
 function addRecentFile(filePath) {
   let list = loadRecentFiles().filter((f) => f !== filePath);
   list.unshift(filePath);
   saveRecentFiles(list);
-  BrowserWindow.getAllWindows().forEach((w) => w.webContents.send('recent-files-changed'));
+  broadcastRecentFilesChanged();
+}
+
+function removeRecentFile(filePath) {
+  const list = loadRecentFiles().filter((f) => f !== filePath);
+  saveRecentFiles(list);
+  broadcastRecentFilesChanged();
 }
 
 // ---- Автосохранение / восстановление после сбоя ----
@@ -92,6 +103,23 @@ const recoveryDir = () => {
 
 function recoveryFilePath(recoveryId) {
   return path.join(recoveryDir(), `${recoveryId}.json`);
+}
+
+// ---- Вспомогательное для файловых имён ----
+
+function sanitizeFileName(name) {
+  const cleaned = (name || '').replace(/[\\/:*?"<>|]/g, '').trim();
+  return cleaned || 'Без имени';
+}
+
+function uniquePath(dir, base, ext) {
+  let candidate = path.join(dir, `${base}${ext}`);
+  let n = 2;
+  while (fs.existsSync(candidate)) {
+    candidate = path.join(dir, `${base} (${n})${ext}`);
+    n += 1;
+  }
+  return candidate;
 }
 
 // ---- Окно ----
@@ -228,6 +256,32 @@ ipcMain.handle('toggle-devtools', (event) => {
   event.sender.toggleDevTools();
 });
 
+// ---- IPC: контекстные меню сайдбара и вкладок ----
+
+ipcMain.handle('show-recent-item-menu', (event, filePath) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  const template = [
+    { label: 'Открыть', click: () => win.webContents.send('open-recent-path', filePath) },
+    { label: 'Показать в проводнике', click: () => shell.showItemInFolder(filePath) },
+    { type: 'separator' },
+    { label: 'Удалить из списка', click: () => removeRecentFile(filePath) },
+  ];
+  Menu.buildFromTemplate(template).popup({ window: win });
+});
+
+ipcMain.handle('show-tab-context-menu', (event, tabId) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  const template = [{ label: 'Новая вкладка', click: () => win.webContents.send('tab-menu-new') }];
+  if (tabId !== null && tabId !== undefined) {
+    template.push(
+      { type: 'separator' },
+      { label: 'Закрыть вкладку', click: () => win.webContents.send('tab-menu-close', tabId) },
+      { label: 'Закрыть остальные', click: () => win.webContents.send('tab-menu-close-others', tabId) }
+    );
+  }
+  Menu.buildFromTemplate(template).popup({ window: win });
+});
+
 // ---- IPC: настройки ----
 
 ipcMain.handle('get-settings', () => settings);
@@ -239,17 +293,26 @@ ipcMain.handle('save-settings', (event, next) => {
   return settings;
 });
 
+ipcMain.handle('choose-folder', async (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  const result = await dialog.showOpenDialog(win, {
+    properties: ['openDirectory', 'createDirectory'],
+  });
+  if (result.canceled || result.filePaths.length === 0) return null;
+  return result.filePaths[0];
+});
+
 // ---- IPC: недавние файлы ----
 
 ipcMain.handle('get-recent-files', () => loadRecentFiles());
 
 // ---- IPC: автосохранение / восстановление ----
 
-ipcMain.handle('autosave-tab', (event, { recoveryId, filePath, fileName, html }) => {
+ipcMain.handle('autosave-tab', (event, { recoveryId, filePath, fileName, titleText, html }) => {
   try {
     fs.writeFileSync(
       recoveryFilePath(recoveryId),
-      JSON.stringify({ filePath, fileName, html, savedAt: Date.now() })
+      JSON.stringify({ filePath, fileName, titleText, html, savedAt: Date.now() })
     );
   } catch (e) {}
 });
@@ -286,7 +349,8 @@ ipcMain.handle('dialog-open', async (event) => {
   const result = await dialog.showOpenDialog(win, {
     properties: ['openFile'],
     filters: [
-      { name: 'Все поддерживаемые', extensions: ['txt', 'html', 'htm'] },
+      { name: 'Все поддерживаемые', extensions: ['docx', 'txt', 'html', 'htm'] },
+      { name: 'Word документ', extensions: ['docx'] },
       { name: 'Текстовый файл', extensions: ['txt'] },
       { name: 'HTML документ', extensions: ['html', 'htm'] },
       { name: 'Все файлы', extensions: ['*'] },
@@ -301,26 +365,38 @@ ipcMain.handle('open-path', async (event, filePath) => {
   return readFileForEditor(filePath);
 });
 
-function readFileForEditor(filePath) {
+async function readFileForEditor(filePath) {
   const ext = path.extname(filePath).toLowerCase();
-  const raw = fs.readFileSync(filePath, 'utf-8');
   let html;
-  if (ext === '.txt') {
+  if (ext === '.docx') {
+    const mammoth = require('mammoth');
+    const result = await mammoth.convertToHtml({ path: filePath });
+    html = result.value;
+  } else if (ext === '.txt') {
+    const raw = fs.readFileSync(filePath, 'utf-8');
     const esc = raw
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
     html = '<p>' + esc.split(/\r?\n/).join('</p><p>') + '</p>';
   } else {
-    html = raw;
+    html = fs.readFileSync(filePath, 'utf-8');
   }
   addRecentFile(filePath);
   return { path: filePath, html, name: path.basename(filePath) };
 }
 
-function writeFile(filePath, html) {
+async function writeFile(filePath, html) {
   const ext = path.extname(filePath).toLowerCase();
-  if (ext === '.txt') {
+  if (ext === '.docx') {
+    const HTMLtoDOCX = require('html-to-docx');
+    const buffer = await HTMLtoDOCX(html, null, {
+      table: { row: { cantSplit: true } },
+      footer: false,
+      pageNumber: false,
+    });
+    fs.writeFileSync(filePath, buffer);
+  } else if (ext === '.txt') {
     const text = html
       .replace(/<\/(p|div|li|h[1-6]|tr)>/gi, '\n')
       .replace(/<br\s*\/?>/gi, '\n')
@@ -336,24 +412,26 @@ function writeFile(filePath, html) {
   }
 }
 
+function formatFilters() {
+  const all = {
+    docx: { name: 'Word документ', extensions: ['docx'] },
+    txt: { name: 'Текстовый файл', extensions: ['txt'] },
+    html: { name: 'HTML документ', extensions: ['html'] },
+  };
+  const fmt = all[settings.defaultSaveFormat] ? settings.defaultSaveFormat : 'docx';
+  const order = [fmt, ...Object.keys(all).filter((k) => k !== fmt)];
+  return { fmt, filters: order.map((k) => all[k]) };
+}
+
 async function saveAsFlow(win, html, suggestedName) {
-  const preferHtml = settings.defaultSaveFormat === 'html';
-  const filters = preferHtml
-    ? [
-        { name: 'HTML документ', extensions: ['html'] },
-        { name: 'Текстовый файл', extensions: ['txt'] },
-      ]
-    : [
-        { name: 'Текстовый файл', extensions: ['txt'] },
-        { name: 'HTML документ', extensions: ['html'] },
-      ];
-  const base = (suggestedName || 'Без имени').replace(/\.(txt|html?)$/i, '');
-  const result = await dialog.showSaveDialog(win, {
-    filters,
-    defaultPath: `${base}.${preferHtml ? 'html' : 'txt'}`,
-  });
+  const { fmt, filters } = formatFilters();
+  const base = sanitizeFileName((suggestedName || '').replace(/\.(docx|txt|html?)$/i, ''));
+  const defaultPath = settings.defaultSaveFolder
+    ? path.join(settings.defaultSaveFolder, `${base}.${fmt}`)
+    : `${base}.${fmt}`;
+  const result = await dialog.showSaveDialog(win, { filters, defaultPath });
   if (result.canceled || !result.filePath) return null;
-  writeFile(result.filePath, html);
+  await writeFile(result.filePath, html);
   addRecentFile(result.filePath);
   return { path: result.filePath, name: path.basename(result.filePath) };
 }
@@ -365,9 +443,49 @@ ipcMain.handle('save-as-dialog', async (event, html, suggestedName) => {
 
 ipcMain.handle('save-file', async (event, filePath, html, suggestedName) => {
   const win = BrowserWindow.fromWebContents(event.sender);
-  if (!filePath) return saveAsFlow(win, html, suggestedName);
-  writeFile(filePath, html);
-  return { path: filePath, name: path.basename(filePath) };
+
+  // Новый документ: если настроена папка по умолчанию — сохраняем в неё
+  // без диалога, иначе как раньше спрашиваем через "Сохранить как".
+  if (!filePath) {
+    if (settings.defaultSaveFolder) {
+      const { fmt } = formatFilters();
+      const base = sanitizeFileName(suggestedName);
+      try {
+        fs.mkdirSync(settings.defaultSaveFolder, { recursive: true });
+        const target = uniquePath(settings.defaultSaveFolder, base, `.${fmt}`);
+        await writeFile(target, html);
+        addRecentFile(target);
+        return { path: target, name: path.basename(target) };
+      } catch (e) {
+        return saveAsFlow(win, html, suggestedName);
+      }
+    }
+    return saveAsFlow(win, html, suggestedName);
+  }
+
+  // Существующий файл: если заголовок документа изменился, переименовываем
+  // сам файл на диске вслед за ним (в той же папке, с тем же расширением).
+  let targetPath = filePath;
+  if (suggestedName) {
+    const dir = path.dirname(filePath);
+    const ext = path.extname(filePath);
+    const currentBase = path.basename(filePath, ext);
+    const desiredBase = sanitizeFileName(suggestedName);
+    if (desiredBase && desiredBase !== currentBase) {
+      const newPath = path.join(dir, `${desiredBase}${ext}`);
+      if (newPath !== filePath && !fs.existsSync(newPath)) {
+        try {
+          fs.renameSync(filePath, newPath);
+          targetPath = newPath;
+          removeRecentFile(filePath);
+        } catch (e) {}
+      }
+    }
+  }
+
+  await writeFile(targetPath, html);
+  if (targetPath !== filePath) addRecentFile(targetPath);
+  return { path: targetPath, name: path.basename(targetPath) };
 });
 
 ipcMain.handle('export-pdf', async (event) => {
