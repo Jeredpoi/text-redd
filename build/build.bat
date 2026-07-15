@@ -1,56 +1,53 @@
 @echo off
 setlocal enabledelayedexpansion
-chcp 65001 >nul
-REM Сборка установщика "Простой Редактор" для Windows.
-REM Требуется установленный Node.js (https://nodejs.org, версия 18 или новее).
 
 cd /d "%~dp0.."
 
 echo ============================================
-echo   Простой Редактор — сборка установщика
+echo   Prostoy Redaktor - installer build
 echo ============================================
 echo.
 
 where node >nul 2>nul
 if errorlevel 1 (
-  echo [Ошибка] Node.js не найден.
-  echo Скачайте и установите Node.js ^(LTS, версия 18 или новее^) с https://nodejs.org
-  echo После установки запустите этот файл ещё раз.
+  echo [Error] Node.js was not found.
+  echo Download and install Node.js ^(LTS, version 18 or newer^) from https://nodejs.org
+  echo Then run this file again.
   goto :error
 )
 
 for /f "tokens=1 delims=v." %%v in ('node -v') do set NODE_MAJOR=%%v
 if %NODE_MAJOR% LSS 18 (
-  echo [Ошибка] Установлена слишком старая версия Node.js:
+  echo [Error] Installed Node.js version is too old:
   node -v
-  echo Нужна версия 18 или новее. Обновите Node.js с https://nodejs.org
+  echo Node.js 18 or newer is required. Update it from https://nodejs.org
   goto :error
 )
 
-echo Найден Node.js:
+echo Found Node.js:
 node -v
 echo.
 
-echo Установка зависимостей ^(может занять несколько минут, нужен интернет^)...
+echo Installing dependencies ^(this can take a few minutes, requires internet^)...
 call npm install
 if errorlevel 1 (
   echo.
-  echo [Ошибка] Не удалось установить зависимости. Проверьте подключение к интернету.
+  echo [Error] Failed to install dependencies. Check your internet connection.
   goto :error
 )
 
 echo.
-echo Сборка установщика ^(NSIS .exe^)...
+echo Building installer ^(NSIS .exe^)...
 call npm run dist
 if errorlevel 1 (
   echo.
-  echo [Ошибка] Сборка установщика не удалась. Смотрите сообщения выше.
+  echo [Error] Building the installer failed. See the messages above.
   goto :error
 )
 
 echo.
 echo ============================================
-echo   Готово! Установщик находится в папке:
+echo   Done! The installer is in the folder:
 echo   %~dp0..\dist_installer
 echo ============================================
 start "" "%~dp0..\dist_installer"
@@ -59,6 +56,6 @@ exit /b 0
 
 :error
 echo.
-echo Сборка прервана из-за ошибки. Смотрите сообщения выше.
+echo Build stopped due to an error. See the messages above.
 pause
 exit /b 1
