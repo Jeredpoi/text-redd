@@ -742,7 +742,7 @@ function closeColorDropdowns() {
 }
 
 function applyForeColor(c) {
-  editor.focus();
+  restoreSelection();
   document.execCommand('foreColor', false, c);
   document.getElementById('foreColorBar').style.background = c;
   markActiveDirty();
@@ -768,7 +768,7 @@ function currentHiliteColor() {
 }
 
 function applyHiliteColor(c) {
-  editor.focus();
+  restoreSelection();
   const current = currentHiliteColor().replace(/\s+/g, '');
   const target = current && current === hexToRgb(c).replace(/\s+/g, '') ? 'transparent' : c;
   document.execCommand('hiliteColor', false, target);
@@ -787,14 +787,20 @@ document.getElementById('foreColorTrigger').addEventListener('click', (e) => {
   e.stopPropagation();
   const willOpen = foreColorDropdown.classList.contains('hidden');
   closeColorDropdowns();
-  if (willOpen) foreColorDropdown.classList.remove('hidden');
+  if (willOpen) {
+    saveSelection();
+    foreColorDropdown.classList.remove('hidden');
+  }
 });
 
 document.getElementById('hiliteColorTrigger').addEventListener('click', (e) => {
   e.stopPropagation();
   const willOpen = hiliteColorDropdown.classList.contains('hidden');
   closeColorDropdowns();
-  if (willOpen) hiliteColorDropdown.classList.remove('hidden');
+  if (willOpen) {
+    saveSelection();
+    hiliteColorDropdown.classList.remove('hidden');
+  }
 });
 
 document.addEventListener('mousedown', (e) => {
