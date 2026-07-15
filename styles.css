@@ -263,6 +263,94 @@ button, input, select { font-family: inherit; }
   min-width: 0;
 }
 
+/* ---- Tab bar ---- */
+
+#tabBar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 10px 0;
+  background: var(--bg);
+  overflow-x: auto;
+}
+
+#tabList {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.tab-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 200px;
+  padding: 8px 8px 8px 14px;
+  border-radius: 10px 10px 0 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tab-pill:hover {
+  background: var(--btn-hover);
+}
+
+.tab-pill.active {
+  background: var(--sidebar-bg);
+  color: var(--text);
+  font-weight: 500;
+}
+
+.tab-pill-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-pill-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: oklch(65% .15 70);
+  flex: none;
+  display: none;
+}
+
+.tab-pill.dirty .tab-pill-dot {
+  display: block;
+}
+
+.tab-pill-close {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: transparent;
+  border-radius: 5px;
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tab-pill-close:hover {
+  background: var(--input-border);
+}
+
+#newTabBtn {
+  flex: none;
+  margin-bottom: 2px;
+}
+
 .ribbon-tabs {
   flex: none;
   display: flex;
@@ -723,11 +811,76 @@ button, input, select { font-family: inherit; }
   box-shadow: var(--shadow);
   padding: 20px 22px;
   width: 300px;
+  max-height: 86vh;
+  overflow-y: auto;
 }
 
 .modal h3 {
   margin: 0 0 14px;
   font-size: 15px;
+}
+
+.modal-message {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+
+.settings-modal {
+  width: 340px;
+}
+
+.settings-section {
+  margin-bottom: 16px;
+}
+
+.settings-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.settings-row.checkbox-row {
+  justify-content: flex-start;
+}
+
+.settings-row select,
+.settings-row input[type="number"] {
+  height: 30px;
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  padding: 0 8px;
+  font-size: 13px;
+  background: var(--input-bg);
+  color: var(--text);
+  width: 140px;
+}
+
+.settings-row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
+.settings-about {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  margin-bottom: 12px;
 }
 
 .modal-field {

@@ -5,17 +5,301 @@ const statsEl = document.getElementById('stats');
 const savedStateEl = document.getElementById('savedState');
 const savedDotEl = document.getElementById('savedDot');
 const pageScrollEl = document.getElementById('pageScroll');
+const tabListEl = document.getElementById('tabList');
 
-let isDirty = false;
-let currentFileLabel = 'Без имени';
-let currentFilePath = null;
+let settings = null;
+let tabs = [];
+let activeTabId = null;
+let nextTabId = 1;
+let autosaveTimer = null;
 
-function setDirty(v) {
-  isDirty = v;
-  savedStateEl.textContent = v ? 'Есть несохранённые изменения' : 'Сохранено';
-  savedDotEl.classList.toggle('dirty', v);
-  window.api.setDirty(v);
+function generateId() {
+  return 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
+
+function getActiveTab() {
+  return tabs.find((t) => t.id === activeTabId) || null;
+}
+
+// ---- Заголовок документа: объединение/разбор при сохранении/открытии ----
+
+function isEmptyHtml(html) {
+  return !html || html === '<br>';
+}
+
+function splitTitleAndBody(html) {
+  const container = document.createElement('div');
+  container.innerHTML = html || '';
+  const first = container.firstElementChild;
+  if (first && first.tagName === 'H1') {
+    const titleHtml = first.innerHTML;
+    first.remove();
+    return { title: titleHtml, body: container.innerHTML };
+  }
+  return { title: '', body: html || '' };
+}
+
+function combinedContent() {
+  const titleHtml = docTitle.innerHTML.trim();
+  return isEmptyHtml(titleHtml) ? editor.innerHTML : `<h1>${titleHtml}</h1>${editor.innerHTML}`;
+}
+
+function combinedContentOf(tab) {
+  if (tab.id === activeTabId) captureActiveTabFromDOM();
+  const titleHtml = (tab.titleHtml || '').trim();
+  return isEmptyHtml(titleHtml) ? (tab.bodyHtml || '') : `<h1>${titleHtml}</h1>${tab.bodyHtml || ''}`;
+}
+
+// ---- Вкладки ----
+
+function createTab(opts) {
+  const tab = {
+    id: nextTabId++,
+    recoveryId: (opts && opts.recoveryId) || generateId(),
+    filePath: (opts && opts.filePath) || null,
+    fileName: (opts && opts.fileName) || 'Без имени',
+    titleHtml: (opts && opts.titleHtml) || '',
+    bodyHtml: (opts && opts.bodyHtml) || '',
+    isDirty: !!(opts && opts.isDirty),
+  };
+  tabs.push(tab);
+  return tab;
+}
+
+function captureActiveTabFromDOM() {
+  const tab = getActiveTab();
+  if (!tab) return;
+  tab.titleHtml = docTitle.innerHTML;
+  tab.bodyHtml = editor.innerHTML;
+}
+
+function setDirtyUI(dirty) {
+  savedStateEl.textContent = dirty ? 'Есть несохранённые изменения' : 'Сохранено';
+  savedDotEl.classList.toggle('dirty', dirty);
+}
+
+function loadTabIntoDOM(tab) {
+  docTitle.innerHTML = tab.titleHtml || '';
+  editor.innerHTML = tab.bodyHtml || '';
+  fileNameEl.textContent = tab.fileName;
+  setDirtyUI(tab.isDirty);
+  updateStats();
+  computeOutline();
+}
+
+function updateWindowTitle() {
+  const tab = getActiveTab();
+  if (!tab) return;
+  window.api.setWindowTitle(`${tab.isDirty ? '* ' : ''}${tab.fileName} — Простой Редактор`);
+}
+
+function markActiveDirty() {
+  const tab = getActiveTab();
+  if (!tab || tab.isDirty) return;
+  tab.isDirty = true;
+  setDirtyUI(true);
+  renderTabBar();
+  updateWindowTitle();
+}
+
+function applyDefaultFont() {
+  if (!settings) return;
+  editor.style.fontFamily = settings.defaultFontName;
+  const sizeMap = { '1': '10px', '2': '12.5px', '3': '15px', '4': '17.5px', '5': '20px', '6': '24px', '7': '30px' };
+  editor.style.fontSize = sizeMap[settings.defaultFontSize] || '16.5px';
+  document.getElementById('fontName').value = settings.defaultFontName;
+  document.getElementById('fontSize').value = settings.defaultFontSize;
+}
+
+function renderTabBar() {
+  tabListEl.innerHTML = '';
+  tabs.forEach((tab) => {
+    const pill = document.createElement('div');
+    pill.className = 'tab-pill' + (tab.id === activeTabId ? ' active' : '') + (tab.isDirty ? ' dirty' : '');
+    pill.title = tab.filePath || tab.fileName;
+
+    const name = document.createElement('span');
+    name.className = 'tab-pill-name';
+    name.textContent = tab.fileName;
+
+    const dot = document.createElement('span');
+    dot.className = 'tab-pill-dot';
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'tab-pill-close';
+    closeBtn.textContent = '✕';
+    closeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeTab(tab.id);
+    });
+
+    pill.appendChild(name);
+    pill.appendChild(dot);
+    pill.appendChild(closeBtn);
+    pill.addEventListener('click', () => switchToTab(tab.id));
+    tabListEl.appendChild(pill);
+  });
+}
+
+function switchToTab(id) {
+  if (id === activeTabId) return;
+  captureActiveTabFromDOM();
+  activeTabId = id;
+  loadTabIntoDOM(getActiveTab());
+  renderTabBar();
+  renderRecentList();
+  updateWindowTitle();
+}
+
+function newTab() {
+  captureActiveTabFromDOM();
+  const tab = createTab({ fileName: 'Без имени' });
+  activeTabId = tab.id;
+  loadTabIntoDOM(tab);
+  applyDefaultFont();
+  renderTabBar();
+  renderRecentList();
+  updateWindowTitle();
+}
+
+function removeTab(id) {
+  const idx = tabs.findIndex((t) => t.id === id);
+  if (idx === -1) return;
+  tabs.splice(idx, 1);
+  if (tabs.length === 0) {
+    const blank = createTab({ fileName: 'Без имени' });
+    activeTabId = blank.id;
+    loadTabIntoDOM(blank);
+    applyDefaultFont();
+  } else if (activeTabId === id) {
+    const next = tabs[Math.max(0, idx - 1)];
+    activeTabId = next.id;
+    loadTabIntoDOM(next);
+  }
+  renderTabBar();
+  renderRecentList();
+  updateWindowTitle();
+}
+
+async function closeTab(id) {
+  const tab = tabs.find((t) => t.id === id);
+  if (!tab) return;
+  if (id !== activeTabId) switchToTab(id);
+  captureActiveTabFromDOM();
+  if (tab.isDirty) {
+    const choice = await showCloseConfirmModal(tab.fileName);
+    if (choice === 'cancel') return;
+    if (choice === 'save') {
+      const ok = await saveActiveTab();
+      if (!ok) return;
+    } else {
+      window.api.clearRecovery(tab.recoveryId);
+    }
+  } else {
+    window.api.clearRecovery(tab.recoveryId);
+  }
+  removeTab(id);
+}
+
+async function confirmCloseAllTabs() {
+  captureActiveTabFromDOM();
+  const dirtyList = tabs.filter((t) => t.isDirty);
+  for (const tab of dirtyList) {
+    if (tab.id !== activeTabId) switchToTab(tab.id);
+    const choice = await showCloseConfirmModal(tab.fileName);
+    if (choice === 'cancel') return false;
+    if (choice === 'save') {
+      const ok = await saveActiveTab();
+      if (!ok) return false;
+    } else {
+      tab.isDirty = false;
+      window.api.clearRecovery(tab.recoveryId);
+    }
+  }
+  return true;
+}
+
+window.api.onCloseRequested(async () => {
+  const ok = await confirmCloseAllTabs();
+  if (ok) window.api.confirmClose();
+});
+
+document.getElementById('newTabBtn').addEventListener('click', newTab);
+
+// ---- Диалог подтверждения закрытия вкладки ----
+
+const closeConfirmModal = document.getElementById('closeConfirmModal');
+const closeConfirmMessageEl = document.getElementById('closeConfirmMessage');
+const closeConfirmSaveBtn = document.getElementById('closeConfirmSaveBtn');
+const closeConfirmDiscardBtn = document.getElementById('closeConfirmDiscardBtn');
+const closeConfirmCancelBtn = document.getElementById('closeConfirmCancelBtn');
+
+function showCloseConfirmModal(name) {
+  return new Promise((resolve) => {
+    closeConfirmMessageEl.textContent = `Документ «${name}» содержит несохранённые изменения.`;
+    closeConfirmModal.classList.remove('hidden');
+    function cleanup(result) {
+      closeConfirmModal.classList.add('hidden');
+      closeConfirmSaveBtn.removeEventListener('click', onSave);
+      closeConfirmDiscardBtn.removeEventListener('click', onDiscard);
+      closeConfirmCancelBtn.removeEventListener('click', onCancel);
+      resolve(result);
+    }
+    function onSave() { cleanup('save'); }
+    function onDiscard() { cleanup('discard'); }
+    function onCancel() { cleanup('cancel'); }
+    closeConfirmSaveBtn.addEventListener('click', onSave);
+    closeConfirmDiscardBtn.addEventListener('click', onDiscard);
+    closeConfirmCancelBtn.addEventListener('click', onCancel);
+  });
+}
+
+// ---- Восстановление после сбоя ----
+
+const recoveryModal = document.getElementById('recoveryModal');
+const recoveryMessageEl = document.getElementById('recoveryMessage');
+const recoveryRestoreBtn = document.getElementById('recoveryRestoreBtn');
+const recoveryDiscardBtn = document.getElementById('recoveryDiscardBtn');
+
+function showRecoveryModal(count) {
+  return new Promise((resolve) => {
+    recoveryMessageEl.textContent = `Похоже, приложение закрылось некорректно. Найдено несохранённых документов: ${count}. Восстановить их?`;
+    recoveryModal.classList.remove('hidden');
+    function cleanup(result) {
+      recoveryModal.classList.add('hidden');
+      recoveryRestoreBtn.removeEventListener('click', onRestore);
+      recoveryDiscardBtn.removeEventListener('click', onDiscard);
+      resolve(result);
+    }
+    function onRestore() { cleanup(true); }
+    function onDiscard() { cleanup(false); }
+    recoveryRestoreBtn.addEventListener('click', onRestore);
+    recoveryDiscardBtn.addEventListener('click', onDiscard);
+  });
+}
+
+// ---- Автосохранение ----
+
+function restartAutosaveTimer() {
+  if (autosaveTimer) clearInterval(autosaveTimer);
+  if (!settings.autosaveEnabled) return;
+  const intervalMs = Math.max(5, settings.autosaveIntervalSec) * 1000;
+  autosaveTimer = setInterval(runAutosave, intervalMs);
+}
+
+function runAutosave() {
+  captureActiveTabFromDOM();
+  tabs.filter((t) => t.isDirty).forEach((t) => {
+    window.api.autosaveTab({
+      recoveryId: t.recoveryId,
+      filePath: t.filePath,
+      fileName: t.fileName,
+      html: combinedContentOf(t),
+    });
+  });
+}
+
+// ---- Статистика ----
 
 function updateStats() {
   const text = editor.innerText || '';
@@ -25,41 +309,12 @@ function updateStats() {
 }
 
 editor.addEventListener('input', () => {
-  setDirty(true);
+  markActiveDirty();
   updateStats();
   computeOutline();
 });
 
-docTitle.addEventListener('input', () => setDirty(true));
-
-// ---- Заголовок документа: объединение/разбор при сохранении/открытии ----
-
-function isEmptyHtml(html) {
-  return !html || html === '<br>';
-}
-
-function combinedContent() {
-  const titleHtml = docTitle.innerHTML.trim();
-  return isEmptyHtml(titleHtml) ? editor.innerHTML : `<h1>${titleHtml}</h1>${editor.innerHTML}`;
-}
-
-function splitTitleAndBody(html) {
-  const container = document.createElement('div');
-  container.innerHTML = html;
-  const first = container.firstElementChild;
-  if (first && first.tagName === 'H1') {
-    const titleHtml = first.innerHTML;
-    first.remove();
-    return { title: titleHtml, body: container.innerHTML };
-  }
-  return { title: '', body: html };
-}
-
-function loadContent(html) {
-  const { title, body } = splitTitleAndBody(html);
-  docTitle.innerHTML = title;
-  editor.innerHTML = body;
-}
+docTitle.addEventListener('input', () => markActiveDirty());
 
 // ---- Оглавление ----
 
@@ -111,13 +366,14 @@ function basename(p) {
 function renderRecentList() {
   const q = recentSearchEl.value.trim().toLowerCase();
   const filtered = q ? recentFilesCache.filter((p) => basename(p).toLowerCase().includes(q)) : recentFilesCache;
+  const activeTab = getActiveTab();
   recentListEl.innerHTML = '';
   recentEmptyEl.classList.toggle('hidden', filtered.length > 0);
   filtered.forEach((p) => {
     const item = document.createElement('div');
     item.className = 'recent-item';
     item.title = p;
-    if (p === currentFilePath) item.classList.add('active');
+    if (activeTab && p === activeTab.filePath) item.classList.add('active');
     const title = document.createElement('div');
     title.className = 'recent-item-title';
     title.textContent = basename(p);
@@ -193,7 +449,7 @@ document.getElementById('hiliteColor').addEventListener('input', (e) => {
 document.getElementById('bubbleHiliteBtn').addEventListener('click', () => {
   editor.focus();
   document.execCommand('hiliteColor', false, lastHiliteColor);
-  setDirty(true);
+  markActiveDirty();
 });
 
 function updateToolbarState() {
@@ -235,15 +491,70 @@ document.addEventListener('selectionchange', updateBubbleToolbar);
 
 const themeToggle = document.getElementById('themeToggle');
 
-function setTheme(dark) {
+function applyTheme(dark) {
   document.body.classList.toggle('dark', dark);
   themeToggle.checked = dark;
-  window.api.setTheme(dark ? 'dark' : 'light');
 }
 
-themeToggle.addEventListener('change', () => setTheme(themeToggle.checked));
-window.api.onMenuToggleTheme(() => setTheme(!document.body.classList.contains('dark')));
-window.api.onApplyTheme((theme) => setTheme(theme === 'dark'));
+themeToggle.addEventListener('change', async () => {
+  const dark = themeToggle.checked;
+  applyTheme(dark);
+  settings = await window.api.saveSettings({ theme: dark ? 'dark' : 'light' });
+});
+
+window.api.onApplyTheme((theme) => applyTheme(theme === 'dark'));
+
+// ---- Настройки ----
+
+const settingsModal = document.getElementById('settingsModal');
+const settingsThemeEl = document.getElementById('settingsTheme');
+const settingsFontNameEl = document.getElementById('settingsFontName');
+const settingsFontSizeEl = document.getElementById('settingsFontSize');
+const settingsAutosaveEnabledEl = document.getElementById('settingsAutosaveEnabled');
+const settingsAutosaveIntervalEl = document.getElementById('settingsAutosaveInterval');
+const settingsSpellRuEl = document.getElementById('settingsSpellRu');
+const settingsSpellEnEl = document.getElementById('settingsSpellEn');
+const settingsSaveFormatEl = document.getElementById('settingsSaveFormat');
+
+function openSettingsModal() {
+  settingsThemeEl.value = settings.theme;
+  settingsFontNameEl.value = settings.defaultFontName;
+  settingsFontSizeEl.value = settings.defaultFontSize;
+  settingsAutosaveEnabledEl.checked = settings.autosaveEnabled;
+  settingsAutosaveIntervalEl.value = settings.autosaveIntervalSec;
+  settingsSpellRuEl.checked = settings.spellcheckRu;
+  settingsSpellEnEl.checked = settings.spellcheckEn;
+  settingsSaveFormatEl.value = settings.defaultSaveFormat;
+  settingsModal.classList.remove('hidden');
+}
+
+function closeSettingsModal() {
+  settingsModal.classList.add('hidden');
+}
+
+document.getElementById('btnSettings').addEventListener('click', openSettingsModal);
+document.getElementById('settingsCancelBtn').addEventListener('click', closeSettingsModal);
+settingsModal.addEventListener('mousedown', (e) => {
+  if (e.target === settingsModal) closeSettingsModal();
+});
+
+document.getElementById('settingsSaveBtn').addEventListener('click', async () => {
+  const next = {
+    theme: settingsThemeEl.value,
+    defaultFontName: settingsFontNameEl.value,
+    defaultFontSize: settingsFontSizeEl.value,
+    autosaveEnabled: settingsAutosaveEnabledEl.checked,
+    autosaveIntervalSec: Math.max(5, Math.min(600, parseInt(settingsAutosaveIntervalEl.value, 10) || 20)),
+    spellcheckRu: settingsSpellRuEl.checked,
+    spellcheckEn: settingsSpellEnEl.checked,
+    defaultSaveFormat: settingsSaveFormatEl.value,
+  };
+  settings = await window.api.saveSettings(next);
+  applyTheme(settings.theme === 'dark');
+  restartAutosaveTimer();
+  closeSettingsModal();
+  showToast('Настройки сохранены.');
+});
 
 // ---- Уведомления (тост) ----
 
@@ -342,7 +653,7 @@ tableOkBtn.addEventListener('click', () => {
   html += '</table><p></p>';
   restoreSelection();
   document.execCommand('insertHTML', false, html);
-  setDirty(true);
+  markActiveDirty();
 });
 
 // ---- Вставка: ссылка ----
@@ -369,7 +680,7 @@ linkOkBtn.addEventListener('click', () => {
   if (!url) return;
   restoreSelection();
   document.execCommand('createLink', false, url);
-  setDirty(true);
+  markActiveDirty();
 });
 
 // ---- Вставка: изображение, линия ----
@@ -380,73 +691,84 @@ document.getElementById('btnImage').addEventListener('click', async () => {
   if (!dataUrl) return;
   restoreSelection();
   document.execCommand('insertHTML', false, `<img src="${dataUrl}" />`);
-  setDirty(true);
+  markActiveDirty();
 });
 
 document.getElementById('btnHr').addEventListener('click', () => {
   editor.focus();
   document.execCommand('insertHorizontalRule', false, null);
-  setDirty(true);
+  markActiveDirty();
 });
 
 // ---- Файловые операции ----
 
-function newDoc() {
-  docTitle.innerHTML = '';
-  editor.innerHTML = '';
-  currentFileLabel = 'Без имени';
-  currentFilePath = null;
-  fileNameEl.textContent = currentFileLabel;
-  setDirty(false);
-  updateStats();
-  computeOutline();
+function openLoadedFileAsTab(res) {
+  captureActiveTabFromDOM();
+  const { title, body } = splitTitleAndBody(res.html);
+  const tab = createTab({ filePath: res.path, fileName: res.name, titleHtml: title, bodyHtml: body });
+  activeTabId = tab.id;
+  loadTabIntoDOM(tab);
+  renderTabBar();
   renderRecentList();
+  updateWindowTitle();
 }
 
 async function openFile() {
   const res = await window.api.openFile();
   if (!res) return;
-  loadContent(res.html);
-  currentFileLabel = res.name;
-  currentFilePath = res.path;
-  fileNameEl.textContent = currentFileLabel;
-  setDirty(false);
-  updateStats();
-  computeOutline();
-  renderRecentList();
+  const existing = tabs.find((t) => t.filePath === res.path);
+  if (existing) {
+    switchToTab(existing.id);
+    return;
+  }
+  openLoadedFileAsTab(res);
 }
 
 async function openPath(p) {
+  const existing = tabs.find((t) => t.filePath === p);
+  if (existing) {
+    switchToTab(existing.id);
+    return;
+  }
   const res = await window.api.openPath(p);
   if (!res) return;
-  loadContent(res.html);
-  currentFileLabel = res.name;
-  currentFilePath = res.path;
-  fileNameEl.textContent = currentFileLabel;
-  setDirty(false);
-  updateStats();
-  computeOutline();
-  renderRecentList();
+  openLoadedFileAsTab(res);
 }
 
-async function saveDoc() {
-  const res = await window.api.save(combinedContent());
-  if (!res) return;
-  currentFileLabel = res.name;
-  currentFilePath = res.path;
-  fileNameEl.textContent = currentFileLabel;
-  setDirty(false);
+async function saveActiveTab() {
+  const tab = getActiveTab();
+  if (!tab) return false;
+  const html = combinedContent();
+  const res = await window.api.saveFile(tab.filePath, html, tab.fileName);
+  if (!res) return false;
+  tab.filePath = res.path;
+  tab.fileName = res.name;
+  tab.isDirty = false;
+  window.api.clearRecovery(tab.recoveryId);
+  fileNameEl.textContent = tab.fileName;
+  setDirtyUI(false);
+  renderTabBar();
   renderRecentList();
+  updateWindowTitle();
+  return true;
 }
 
-async function saveDocAs() {
-  const res = await window.api.saveAs(combinedContent());
-  if (!res) return;
-  currentFileLabel = res.name;
-  currentFilePath = res.path;
-  fileNameEl.textContent = currentFileLabel;
-  setDirty(false);
+async function saveActiveTabAs() {
+  const tab = getActiveTab();
+  if (!tab) return false;
+  const html = combinedContent();
+  const res = await window.api.saveAsDialog(html, tab.fileName);
+  if (!res) return false;
+  tab.filePath = res.path;
+  tab.fileName = res.name;
+  tab.isDirty = false;
+  window.api.clearRecovery(tab.recoveryId);
+  fileNameEl.textContent = tab.fileName;
+  setDirtyUI(false);
+  renderTabBar();
   renderRecentList();
+  updateWindowTitle();
+  return true;
 }
 
 async function exportPdf() {
@@ -457,18 +779,13 @@ async function exportDocx() {
   await window.api.exportDocx(combinedContent());
 }
 
-window.api.onMenuNew(newDoc);
-window.api.onMenuOpen(openFile);
-window.api.onMenuOpenPath(openPath);
-window.api.onMenuSave(saveDoc);
-window.api.onMenuSaveAs(saveDocAs);
-window.api.onMenuExportPdf(exportPdf);
-window.api.onMenuExportDocx(exportDocx);
-
-window.api.onMenuInsertTable(() => document.getElementById('btnTable').click());
-window.api.onMenuInsertLink(() => document.getElementById('btnLink').click());
-window.api.onMenuInsertImage(() => document.getElementById('btnImage').click());
-window.api.onMenuInsertHr(() => document.getElementById('btnHr').click());
+document.getElementById('btnNewTab').addEventListener('click', newTab);
+document.getElementById('btnOpen').addEventListener('click', openFile);
+document.getElementById('btnSave').addEventListener('click', saveActiveTab);
+document.getElementById('btnSaveAs').addEventListener('click', saveActiveTabAs);
+document.getElementById('btnExportPdf').addEventListener('click', exportPdf);
+document.getElementById('btnExportDocx').addEventListener('click', exportDocx);
+document.getElementById('btnPrint').addEventListener('click', () => window.api.print());
 
 // ---- Поиск и замена ----
 
@@ -478,10 +795,12 @@ const replaceInput = document.getElementById('replaceInput');
 const matchLabelEl = document.getElementById('matchLabel');
 const findToggleBtn = document.getElementById('findToggleBtn');
 const findToggleBtn2 = document.getElementById('findToggleBtn2');
+const findToggleBtn3 = document.getElementById('findToggleBtn3');
 
 function setFindActive(active) {
   findToggleBtn.classList.toggle('active', active);
   findToggleBtn2.classList.toggle('active', active);
+  findToggleBtn3.classList.toggle('active', active);
 }
 
 function openFindBar() {
@@ -513,6 +832,7 @@ function updateMatchLabel() {
 
 findToggleBtn.addEventListener('click', toggleFindBar);
 findToggleBtn2.addEventListener('click', toggleFindBar);
+findToggleBtn3.addEventListener('click', toggleFindBar);
 document.getElementById('closeFindBtn').addEventListener('click', closeFindBar);
 findInput.addEventListener('input', updateMatchLabel);
 
@@ -528,7 +848,7 @@ document.getElementById('replaceBtn').addEventListener('click', () => {
   const sel = window.getSelection();
   if (sel.rangeCount > 0 && sel.toString().toLowerCase() === findInput.value.toLowerCase()) {
     document.execCommand('insertText', false, replaceInput.value);
-    setDirty(true);
+    markActiveDirty();
   }
   document.getElementById('findNextBtn').click();
 });
@@ -539,24 +859,70 @@ document.getElementById('replaceAllBtn').addEventListener('click', () => {
   if (!term) return;
   const regex = new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
   editor.innerHTML = editor.innerHTML.replace(regex, repl);
-  setDirty(true);
+  markActiveDirty();
   updateStats();
   computeOutline();
   updateMatchLabel();
 });
 
-window.api.onMenuFind(openFindBar);
+// ---- Горячие клавиши (нативного меню больше нет) ----
 
 document.addEventListener('keydown', (e) => {
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
-    e.preventDefault();
-    openFindBar();
-  }
-  if (e.key === 'Escape') closeFindBar();
+  const mod = e.ctrlKey || e.metaKey;
+  const key = e.key.toLowerCase();
+
+  if (mod && !e.shiftKey && key === 'n') { e.preventDefault(); newTab(); return; }
+  if (mod && key === 'o') { e.preventDefault(); openFile(); return; }
+  if (mod && e.shiftKey && key === 's') { e.preventDefault(); saveActiveTabAs(); return; }
+  if (mod && key === 's') { e.preventDefault(); saveActiveTab(); return; }
+  if (mod && key === 'p') { e.preventDefault(); window.api.print(); return; }
+  if (mod && key === 'w') { e.preventDefault(); closeTab(activeTabId); return; }
+  if (mod && key === 'f') { e.preventDefault(); openFindBar(); return; }
+  if (mod && e.shiftKey && key === 'i') { e.preventDefault(); window.api.toggleDevTools(); return; }
+  if (e.key === 'F12') { e.preventDefault(); window.api.toggleDevTools(); return; }
+  if (e.key === 'F11') { e.preventDefault(); window.api.toggleFullscreen(); return; }
+  if (mod && (e.key === '=' || e.key === '+')) { e.preventDefault(); window.api.zoomIn(); return; }
+  if (mod && e.key === '-') { e.preventDefault(); window.api.zoomOut(); return; }
+  if (mod && e.key === '0') { e.preventDefault(); window.api.zoomReset(); return; }
+  if (e.key === 'Escape') { closeFindBar(); return; }
 });
 
 // ---- Инициализация ----
 
-newDoc();
-refreshRecentFiles();
-editor.focus();
+async function init() {
+  settings = await window.api.getSettings();
+  applyTheme(settings.theme === 'dark');
+
+  const recoveries = await window.api.listRecoveries();
+  if (recoveries.length > 0) {
+    const restore = await showRecoveryModal(recoveries.length);
+    if (restore) {
+      recoveries.forEach((r) => {
+        const { title, body } = splitTitleAndBody(r.html || '');
+        createTab({
+          filePath: r.filePath || null,
+          fileName: r.fileName || 'Без имени',
+          titleHtml: title,
+          bodyHtml: body,
+          isDirty: true,
+          recoveryId: r.recoveryId,
+        });
+      });
+      activeTabId = tabs[0].id;
+      loadTabIntoDOM(tabs[0]);
+    } else {
+      recoveries.forEach((r) => window.api.clearRecovery(r.recoveryId));
+      newTab();
+    }
+  } else {
+    newTab();
+  }
+
+  renderTabBar();
+  refreshRecentFiles();
+  updateWindowTitle();
+  restartAutosaveTimer();
+  editor.focus();
+}
+
+init();

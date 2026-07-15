@@ -2,7 +2,60 @@ const { app, BrowserWindow, Menu, dialog, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
-let lastTheme = 'light';
+// ---- Настройки ----
+
+const settingsPath = () => path.join(app.getPath('userData'), 'settings.json');
+
+const defaultSettings = {
+  theme: 'light',
+  defaultFontName: 'Calibri',
+  defaultFontSize: '3',
+  autosaveEnabled: true,
+  autosaveIntervalSec: 20,
+  spellcheckRu: true,
+  spellcheckEn: true,
+  defaultSaveFormat: 'txt',
+};
+
+function loadSettings() {
+  try {
+    return { ...defaultSettings, ...JSON.parse(fs.readFileSync(settingsPath(), 'utf-8')) };
+  } catch (e) {
+    return { ...defaultSettings };
+  }
+}
+
+function persistSettings(s) {
+  try {
+    fs.writeFileSync(settingsPath(), JSON.stringify(s, null, 2));
+  } catch (e) {}
+}
+
+let settings = loadSettings();
+
+function spellcheckLanguages() {
+  const langs = [];
+  if (settings.spellcheckRu) langs.push('ru');
+  if (settings.spellcheckEn) langs.push('en-US');
+  return langs;
+}
+
+function applySpellcheck(win) {
+  const ses = win.webContents.session;
+  const langs = spellcheckLanguages();
+  try {
+    if (langs.length > 0) {
+      ses.setSpellCheckerEnabled(true);
+      ses.setSpellCheckerLanguages(langs);
+    } else {
+      ses.setSpellCheckerEnabled(false);
+    }
+  } catch (e) {
+    console.error('Не удалось настроить проверку орфографии:', e);
+  }
+}
+
+// ---- Недавние файлы ----
 
 const recentFilesPath = () => path.join(app.getPath('userData'), 'recent-files.json');
 
@@ -24,35 +77,33 @@ function addRecentFile(filePath) {
   let list = loadRecentFiles().filter((f) => f !== filePath);
   list.unshift(filePath);
   saveRecentFiles(list);
-  buildMenu();
   BrowserWindow.getAllWindows().forEach((w) => w.webContents.send('recent-files-changed'));
 }
 
-function focusedWindow() {
-  return BrowserWindow.getFocusedWindow();
+// ---- Автосохранение / восстановление после сбоя ----
+
+const recoveryDir = () => {
+  const dir = path.join(app.getPath('userData'), 'recovery');
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+  } catch (e) {}
+  return dir;
+};
+
+function recoveryFilePath(recoveryId) {
+  return path.join(recoveryDir(), `${recoveryId}.json`);
 }
 
-// Каждое окно хранит своё собственное состояние документа (путь к файлу,
-// есть ли несохранённые изменения), чтобы окна не мешали друг другу.
-function stateFor(win) {
-  if (!win.docState) win.docState = { filePath: null, isDirty: false, pendingClose: false };
-  return win.docState;
-}
-
-function updateTitle(win) {
-  const state = stateFor(win);
-  const name = state.filePath ? path.basename(state.filePath) : 'Без имени';
-  win.setTitle(`${state.isDirty ? '* ' : ''}${name} — Простой Редактор`);
-}
+// ---- Окно ----
 
 function createWindow() {
   const win = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 700,
-    minHeight: 500,
+    width: 1300,
+    height: 840,
+    minWidth: 760,
+    minHeight: 520,
     icon: path.join(__dirname, 'build', 'icon.ico'),
-    backgroundColor: lastTheme === 'dark' ? '#1e1f24' : '#f4f4f6',
+    backgroundColor: settings.theme === 'dark' ? '#1e1f24' : '#f4f4f6',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -61,25 +112,16 @@ function createWindow() {
     },
   });
 
-  stateFor(win);
   win.loadFile('index.html');
-  updateTitle(win);
+  applySpellcheck(win);
 
   win.webContents.on('did-finish-load', () => {
-    win.webContents.send('apply-theme', lastTheme);
+    win.webContents.send('apply-theme', settings.theme);
   });
 
-  // Включаем встроенную проверку орфографии Electron/Chromium для русского и английского
-  const ses = win.webContents.session;
-  try {
-    ses.setSpellCheckerLanguages(['ru', 'en-US']);
-  } catch (e) {
-    console.error('Не удалось установить языки словаря:', e);
-  }
-
-  // Контекстное меню с вариантами исправления орфографии
   win.webContents.on('context-menu', (event, params) => {
     const menuItems = [];
+    const ses = win.webContents.session;
 
     if (params.misspelledWord) {
       for (const suggestion of params.dictionarySuggestions) {
@@ -108,125 +150,21 @@ function createWindow() {
     Menu.buildFromTemplate(menuItems).popup();
   });
 
-  win.on('close', async (e) => {
-    const state = stateFor(win);
-    if (state.isDirty) {
-      e.preventDefault();
-      const choice = await dialog.showMessageBox(win, {
-        type: 'question',
-        buttons: ['Сохранить', 'Не сохранять', 'Отмена'],
-        defaultId: 0,
-        cancelId: 2,
-        message: 'Сохранить изменения перед закрытием?',
-      });
-      if (choice.response === 0) {
-        state.pendingClose = true;
-        win.webContents.send('menu-save');
-      } else if (choice.response === 1) {
-        state.isDirty = false;
-        win.close();
-      }
-    }
+  // Закрытие окна всегда сначала спрашивает рендерер — там могут быть
+  // несохранённые вкладки, состояние которых знает только он сам.
+  win.on('close', (e) => {
+    if (win.allowClose) return;
+    e.preventDefault();
+    win.webContents.send('app-close-requested');
   });
 
   return win;
 }
 
-function buildMenu() {
-  const recent = loadRecentFiles();
-
-  const template = [
-    {
-      label: 'Файл',
-      submenu: [
-        { label: 'Новый', accelerator: 'CmdOrCtrl+N', click: () => focusedWindow()?.webContents.send('menu-new') },
-        { label: 'Новое окно', accelerator: 'CmdOrCtrl+Shift+N', click: () => createWindow() },
-        { label: 'Открыть…', accelerator: 'CmdOrCtrl+O', click: () => focusedWindow()?.webContents.send('menu-open') },
-        {
-          label: 'Открыть недавние',
-          submenu:
-            recent.length > 0
-              ? recent.map((f) => ({
-                  label: f,
-                  click: () => focusedWindow()?.webContents.send('menu-open-path', f),
-                }))
-              : [{ label: 'Пусто', enabled: false }],
-        },
-        { type: 'separator' },
-        { label: 'Сохранить', accelerator: 'CmdOrCtrl+S', click: () => focusedWindow()?.webContents.send('menu-save') },
-        { label: 'Сохранить как…', accelerator: 'CmdOrCtrl+Shift+S', click: () => focusedWindow()?.webContents.send('menu-save-as') },
-        { type: 'separator' },
-        { label: 'Экспорт в PDF…', click: () => focusedWindow()?.webContents.send('menu-export-pdf') },
-        { label: 'Экспорт в Word (.docx)…', click: () => focusedWindow()?.webContents.send('menu-export-docx') },
-        { type: 'separator' },
-        { label: 'Печать…', accelerator: 'CmdOrCtrl+P', click: () => focusedWindow()?.webContents.print() },
-        { type: 'separator' },
-        { label: 'Выход', role: 'quit' },
-      ],
-    },
-    {
-      label: 'Правка',
-      submenu: [
-        { label: 'Отменить', accelerator: 'CmdOrCtrl+Z', role: 'undo' },
-        { label: 'Повторить', accelerator: 'CmdOrCtrl+Y', role: 'redo' },
-        { type: 'separator' },
-        { label: 'Вырезать', role: 'cut' },
-        { label: 'Копировать', role: 'copy' },
-        { label: 'Вставить', role: 'paste' },
-        { label: 'Выделить всё', role: 'selectAll' },
-        { type: 'separator' },
-        { label: 'Найти и заменить…', accelerator: 'CmdOrCtrl+F', click: () => focusedWindow()?.webContents.send('menu-find') },
-      ],
-    },
-    {
-      label: 'Вид',
-      submenu: [
-        { label: 'Тёмная тема', click: () => focusedWindow()?.webContents.send('menu-toggle-theme') },
-        { type: 'separator' },
-        { label: 'Увеличить масштаб', role: 'zoomIn' },
-        { label: 'Уменьшить масштаб', role: 'zoomOut' },
-        { label: 'Сбросить масштаб', role: 'resetZoom' },
-        { type: 'separator' },
-        { label: 'Полноэкранный режим', role: 'togglefullscreen' },
-        { label: 'Инструменты разработчика', role: 'toggleDevTools' },
-      ],
-    },
-    {
-      label: 'Вставка',
-      submenu: [
-        { label: 'Таблица…', click: () => focusedWindow()?.webContents.send('menu-insert-table') },
-        { label: 'Ссылка…', click: () => focusedWindow()?.webContents.send('menu-insert-link') },
-        { label: 'Изображение…', click: () => focusedWindow()?.webContents.send('menu-insert-image') },
-        { label: 'Горизонтальная линия', click: () => focusedWindow()?.webContents.send('menu-insert-hr') },
-      ],
-    },
-    {
-      label: 'Справка',
-      submenu: [
-        {
-          label: 'О программе',
-          click: () => {
-            const opts = {
-              type: 'info',
-              title: 'О программе',
-              message: 'Простой Редактор',
-              detail: 'Версия 1.0.0\nТекстовый редактор с проверкой орфографии (RU/EN)',
-            };
-            const win = focusedWindow();
-            if (win) dialog.showMessageBox(win, opts);
-            else dialog.showMessageBox(opts);
-          },
-        },
-      ],
-    },
-  ];
-
-  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
-}
+Menu.setApplicationMenu(null);
 
 app.whenReady().then(() => {
   createWindow();
-  buildMenu();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -237,22 +175,101 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-// ---- IPC: тема ----
+// ---- IPC: закрытие окна ----
 
-ipcMain.handle('set-theme', (event, theme) => {
-  lastTheme = theme;
+ipcMain.handle('confirm-close', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win) return;
+  win.allowClose = true;
+  win.close();
 });
 
-// ---- IPC: файловые операции ----
+// ---- IPC: заголовок окна, печать, масштаб, полноэкранный режим ----
+
+ipcMain.handle('set-window-title', (event, title) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win) win.setTitle(title);
+});
+
+ipcMain.handle('print', (event) => {
+  BrowserWindow.fromWebContents(event.sender)?.webContents.print();
+});
+
+ipcMain.handle('zoom-in', (event) => {
+  const wc = event.sender;
+  wc.setZoomLevel(wc.getZoomLevel() + 0.5);
+});
+
+ipcMain.handle('zoom-out', (event) => {
+  const wc = event.sender;
+  wc.setZoomLevel(wc.getZoomLevel() - 0.5);
+});
+
+ipcMain.handle('zoom-reset', (event) => {
+  event.sender.setZoomLevel(0);
+});
+
+ipcMain.handle('toggle-fullscreen', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win) win.setFullScreen(!win.isFullScreen());
+});
+
+ipcMain.handle('toggle-devtools', (event) => {
+  event.sender.toggleDevTools();
+});
+
+// ---- IPC: настройки ----
+
+ipcMain.handle('get-settings', () => settings);
+
+ipcMain.handle('save-settings', (event, next) => {
+  settings = { ...settings, ...next };
+  persistSettings(settings);
+  BrowserWindow.getAllWindows().forEach((w) => applySpellcheck(w));
+  return settings;
+});
+
+// ---- IPC: недавние файлы ----
 
 ipcMain.handle('get-recent-files', () => loadRecentFiles());
 
-ipcMain.handle('dirty-state', (event, dirty) => {
-  const win = BrowserWindow.fromWebContents(event.sender);
-  if (!win) return;
-  stateFor(win).isDirty = dirty;
-  updateTitle(win);
+// ---- IPC: автосохранение / восстановление ----
+
+ipcMain.handle('autosave-tab', (event, { recoveryId, filePath, fileName, html }) => {
+  try {
+    fs.writeFileSync(
+      recoveryFilePath(recoveryId),
+      JSON.stringify({ filePath, fileName, html, savedAt: Date.now() })
+    );
+  } catch (e) {}
 });
+
+ipcMain.handle('clear-recovery', (event, recoveryId) => {
+  try {
+    fs.unlinkSync(recoveryFilePath(recoveryId));
+  } catch (e) {}
+});
+
+ipcMain.handle('list-recoveries', () => {
+  try {
+    return fs
+      .readdirSync(recoveryDir())
+      .filter((f) => f.endsWith('.json'))
+      .map((f) => {
+        try {
+          const data = JSON.parse(fs.readFileSync(path.join(recoveryDir(), f), 'utf-8'));
+          return { recoveryId: f.replace(/\.json$/, ''), ...data };
+        } catch (e) {
+          return null;
+        }
+      })
+      .filter(Boolean);
+  } catch (e) {
+    return [];
+  }
+});
+
+// ---- IPC: файловые операции ----
 
 ipcMain.handle('dialog-open', async (event) => {
   const win = BrowserWindow.fromWebContents(event.sender);
@@ -266,16 +283,15 @@ ipcMain.handle('dialog-open', async (event) => {
     ],
   });
   if (result.canceled || result.filePaths.length === 0) return null;
-  return readFileForEditor(win, result.filePaths[0]);
+  return readFileForEditor(result.filePaths[0]);
 });
 
 ipcMain.handle('open-path', async (event, filePath) => {
-  const win = BrowserWindow.fromWebContents(event.sender);
   if (!fs.existsSync(filePath)) return null;
-  return readFileForEditor(win, filePath);
+  return readFileForEditor(filePath);
 });
 
-function readFileForEditor(win, filePath) {
+function readFileForEditor(filePath) {
   const ext = path.extname(filePath).toLowerCase();
   const raw = fs.readFileSync(filePath, 'utf-8');
   let html;
@@ -288,57 +304,9 @@ function readFileForEditor(win, filePath) {
   } else {
     html = raw;
   }
-  const state = stateFor(win);
-  state.filePath = filePath;
-  state.isDirty = false;
-  updateTitle(win);
   addRecentFile(filePath);
   return { path: filePath, html, name: path.basename(filePath) };
 }
-
-async function saveAsFlow(win, html) {
-  const result = await dialog.showSaveDialog(win, {
-    filters: [
-      { name: 'Текстовый файл', extensions: ['txt'] },
-      { name: 'HTML документ', extensions: ['html'] },
-    ],
-    defaultPath: 'Без имени.txt',
-  });
-  if (result.canceled || !result.filePath) return null;
-  writeFile(result.filePath, html);
-  const state = stateFor(win);
-  state.filePath = result.filePath;
-  state.isDirty = false;
-  updateTitle(win);
-  addRecentFile(result.filePath);
-  return { path: result.filePath, name: path.basename(result.filePath) };
-}
-
-ipcMain.handle('dialog-save-as', async (event, html) => {
-  const win = BrowserWindow.fromWebContents(event.sender);
-  return saveAsFlow(win, html);
-});
-
-ipcMain.handle('save-current', async (event, html) => {
-  const win = BrowserWindow.fromWebContents(event.sender);
-  const state = stateFor(win);
-  let result;
-  if (!state.filePath) {
-    result = await saveAsFlow(win, html);
-  } else {
-    writeFile(state.filePath, html);
-    state.isDirty = false;
-    updateTitle(win);
-    result = { path: state.filePath, name: path.basename(state.filePath) };
-  }
-  if (result && state.pendingClose) {
-    state.pendingClose = false;
-    win.close();
-  } else if (!result) {
-    state.pendingClose = false;
-  }
-  return result;
-});
 
 function writeFile(filePath, html) {
   const ext = path.extname(filePath).toLowerCase();
@@ -357,6 +325,40 @@ function writeFile(filePath, html) {
     fs.writeFileSync(filePath, full, 'utf-8');
   }
 }
+
+async function saveAsFlow(win, html, suggestedName) {
+  const preferHtml = settings.defaultSaveFormat === 'html';
+  const filters = preferHtml
+    ? [
+        { name: 'HTML документ', extensions: ['html'] },
+        { name: 'Текстовый файл', extensions: ['txt'] },
+      ]
+    : [
+        { name: 'Текстовый файл', extensions: ['txt'] },
+        { name: 'HTML документ', extensions: ['html'] },
+      ];
+  const base = (suggestedName || 'Без имени').replace(/\.(txt|html?)$/i, '');
+  const result = await dialog.showSaveDialog(win, {
+    filters,
+    defaultPath: `${base}.${preferHtml ? 'html' : 'txt'}`,
+  });
+  if (result.canceled || !result.filePath) return null;
+  writeFile(result.filePath, html);
+  addRecentFile(result.filePath);
+  return { path: result.filePath, name: path.basename(result.filePath) };
+}
+
+ipcMain.handle('save-as-dialog', async (event, html, suggestedName) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  return saveAsFlow(win, html, suggestedName);
+});
+
+ipcMain.handle('save-file', async (event, filePath, html, suggestedName) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!filePath) return saveAsFlow(win, html, suggestedName);
+  writeFile(filePath, html);
+  return { path: filePath, name: path.basename(filePath) };
+});
 
 ipcMain.handle('export-pdf', async (event) => {
   const win = BrowserWindow.fromWebContents(event.sender);

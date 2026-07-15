@@ -45,9 +45,15 @@
     </aside>
 
     <div id="main">
+      <div id="tabBar">
+        <div id="tabList"></div>
+        <button id="newTabBtn" class="rail-btn" title="Новая вкладка (Ctrl+N)">+</button>
+      </div>
+
       <div class="ribbon-tabs" role="tablist">
         <button class="ribbon-tab active" data-target="ribbon-home" role="tab">Главная</button>
         <button class="ribbon-tab" data-target="ribbon-insert" role="tab">Вставка</button>
+        <button class="ribbon-tab" data-target="ribbon-file" role="tab">Файл</button>
       </div>
 
       <div id="ribbon-home" class="ribbon-panel active">
@@ -147,6 +153,44 @@
         <button id="findToggleBtn2" class="pill-btn find-pill" title="Поиск и замена (Ctrl+F)">⌕ Найти</button>
       </div>
 
+      <div id="ribbon-file" class="ribbon-panel">
+        <button class="pill-btn labeled" id="btnNewTab" title="Новая вкладка (Ctrl+N)">
+          <svg viewBox="0 0 20 20"><rect x="4" y="2" width="10" height="14" rx="1.5"/><line x1="14" y1="12" x2="18" y2="12"/><line x1="16" y1="10" x2="16" y2="14"/></svg>
+          <span>Новый</span>
+        </button>
+        <button class="pill-btn labeled" id="btnOpen" title="Открыть (Ctrl+O)">
+          <svg viewBox="0 0 20 20"><polyline points="2,6 2,16 18,16 18,7 9,7 7,5 2,5 2,6"/></svg>
+          <span>Открыть</span>
+        </button>
+        <span class="sep"></span>
+        <button class="pill-btn labeled" id="btnSave" title="Сохранить (Ctrl+S)">
+          <svg viewBox="0 0 20 20"><rect x="3" y="3" width="14" height="14" rx="1"/><rect x="6" y="3" width="8" height="5"/><rect x="6" y="11" width="8" height="5"/></svg>
+          <span>Сохранить</span>
+        </button>
+        <button class="pill-btn labeled" id="btnSaveAs" title="Сохранить как… (Ctrl+Shift+S)">
+          <svg viewBox="0 0 20 20"><rect x="3" y="3" width="14" height="14" rx="1"/><rect x="6" y="3" width="8" height="5"/><line x1="7" y1="13" x2="13" y2="13"/></svg>
+          <span>Сохранить как</span>
+        </button>
+        <span class="sep"></span>
+        <button class="pill-btn labeled" id="btnExportPdf" title="Экспорт в PDF">
+          <svg viewBox="0 0 20 20"><rect x="4" y="2" width="12" height="15" rx="1"/><polyline points="7,10 10,13 13,10"/><line x1="10" y1="6" x2="10" y2="13"/></svg>
+          <span>PDF</span>
+        </button>
+        <button class="pill-btn labeled" id="btnExportDocx" title="Экспорт в Word (.docx)">
+          <svg viewBox="0 0 20 20"><rect x="4" y="2" width="12" height="15" rx="1"/><polyline points="7,10 10,13 13,10"/><line x1="10" y1="6" x2="10" y2="13"/></svg>
+          <span>Word</span>
+        </button>
+        <button class="pill-btn labeled" id="btnPrint" title="Печать (Ctrl+P)">
+          <svg viewBox="0 0 20 20"><rect x="4" y="7" width="12" height="6" rx="1"/><rect x="6" y="2" width="8" height="5"/><rect x="6" y="13" width="8" height="5"/></svg>
+          <span>Печать</span>
+        </button>
+        <span class="flex-spacer"></span>
+        <button id="findToggleBtn3" class="pill-btn find-pill" title="Поиск и замена (Ctrl+F)">⌕ Найти</button>
+        <button class="pill-btn icon-only" id="btnSettings" title="Настройки">
+          <svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="3.2"/><line x1="10" y1="2" x2="10" y2="4.5"/><line x1="10" y1="15.5" x2="10" y2="18"/><line x1="2" y1="10" x2="4.5" y2="10"/><line x1="15.5" y1="10" x2="18" y2="10"/><line x1="4.5" y1="4.5" x2="6.2" y2="6.2"/><line x1="13.8" y1="13.8" x2="15.5" y2="15.5"/><line x1="4.5" y1="15.5" x2="6.2" y2="13.8"/><line x1="13.8" y1="6.2" x2="15.5" y2="4.5"/></svg>
+        </button>
+      </div>
+
       <div id="findBar" class="hidden">
         <input type="text" id="findInput" placeholder="Найти…" />
         <input type="text" id="replaceInput" placeholder="Заменить на…" />
@@ -206,6 +250,104 @@
       <div class="modal-actions">
         <button id="linkCancelBtn" class="btn-secondary">Отмена</button>
         <button id="linkOkBtn" class="btn-primary">Вставить</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="closeConfirmModal" class="modal-overlay hidden">
+    <div class="modal">
+      <h3>Сохранить изменения?</h3>
+      <p id="closeConfirmMessage" class="modal-message"></p>
+      <div class="modal-actions">
+        <button id="closeConfirmCancelBtn" class="btn-secondary">Отмена</button>
+        <button id="closeConfirmDiscardBtn" class="btn-secondary">Не сохранять</button>
+        <button id="closeConfirmSaveBtn" class="btn-primary">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="recoveryModal" class="modal-overlay hidden">
+    <div class="modal">
+      <h3>Восстановить документы?</h3>
+      <p id="recoveryMessage" class="modal-message"></p>
+      <div class="modal-actions">
+        <button id="recoveryDiscardBtn" class="btn-secondary">Не восстанавливать</button>
+        <button id="recoveryRestoreBtn" class="btn-primary">Восстановить</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="settingsModal" class="modal-overlay hidden">
+    <div class="modal settings-modal">
+      <h3>Настройки</h3>
+
+      <div class="settings-section">
+        <div class="settings-section-title">Внешний вид</div>
+        <label class="settings-row">Тема
+          <select id="settingsTheme">
+            <option value="light">Светлая</option>
+            <option value="dark">Тёмная</option>
+          </select>
+        </label>
+        <label class="settings-row">Шрифт по умолчанию
+          <select id="settingsFontName">
+            <option value="Calibri">Calibri</option>
+            <option value="Georgia">Georgia</option>
+            <option value="Arial">Arial</option>
+            <option value="Times New Roman">Times New Roman</option>
+            <option value="Courier New">Courier New</option>
+            <option value="Verdana">Verdana</option>
+          </select>
+        </label>
+        <label class="settings-row">Размер по умолчанию
+          <select id="settingsFontSize">
+            <option value="1">8</option>
+            <option value="2">10</option>
+            <option value="3">12</option>
+            <option value="4">14</option>
+            <option value="5">18</option>
+            <option value="6">24</option>
+            <option value="7">36</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">Автосохранение</div>
+        <label class="settings-row checkbox-row">
+          <input type="checkbox" id="settingsAutosaveEnabled" />
+          Автоматически сохранять черновик
+        </label>
+        <label class="settings-row">Интервал (секунд)
+          <input type="number" id="settingsAutosaveInterval" min="5" max="600" />
+        </label>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">Орфография</div>
+        <label class="settings-row checkbox-row">
+          <input type="checkbox" id="settingsSpellRu" /> Русский
+        </label>
+        <label class="settings-row checkbox-row">
+          <input type="checkbox" id="settingsSpellEn" /> English
+        </label>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">Файлы</div>
+        <label class="settings-row">Формат сохранения по умолчанию
+          <select id="settingsSaveFormat">
+            <option value="txt">Текстовый файл (.txt)</option>
+            <option value="html">HTML документ (.html)</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="settings-about">Простой Редактор · версия 1.0.0</div>
+
+      <div class="modal-actions">
+        <button id="settingsCancelBtn" class="btn-secondary">Отмена</button>
+        <button id="settingsSaveBtn" class="btn-primary">Сохранить</button>
       </div>
     </div>
   </div>
