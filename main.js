@@ -1,4 +1,5 @@
 const { app, BrowserWindow, Menu, dialog, ipcMain, shell } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
 
@@ -201,12 +202,66 @@ function createWindow() {
 
 Menu.setApplicationMenu(null);
 
+// ---- Автообновление ----
+
+autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = true;
+
+let manualUpdateCheck = false;
+
+function broadcast(channel, payload) {
+  BrowserWindow.getAllWindows().forEach((w) => w.webContents.send(channel, payload));
+}
+
+async function checkForUpdates(manual) {
+  if (!app.isPackaged) {
+    if (manual) broadcast('update-not-available');
+    return;
+  }
+  manualUpdateCheck = !!manual;
+  try {
+    await autoUpdater.checkForUpdates();
+  } catch (e) {
+    if (manual) broadcast('update-error', { message: (e && e.message) || String(e) });
+    manualUpdateCheck = false;
+  }
+}
+
+autoUpdater.on('update-available', (info) => {
+  manualUpdateCheck = false;
+  broadcast('update-available', {
+    version: info.version,
+    releaseNotes: typeof info.releaseNotes === 'string' ? info.releaseNotes : '',
+  });
+});
+
+autoUpdater.on('update-not-available', () => {
+  if (manualUpdateCheck) broadcast('update-not-available');
+  manualUpdateCheck = false;
+});
+
+autoUpdater.on('download-progress', (progress) => {
+  broadcast('update-download-progress', { percent: progress.percent });
+});
+
+autoUpdater.on('update-downloaded', (info) => {
+  broadcast('update-downloaded', { version: info.version });
+});
+
+autoUpdater.on('error', (err) => {
+  if (manualUpdateCheck) broadcast('update-error', { message: (err && err.message) || String(err) });
+  manualUpdateCheck = false;
+});
+
 app.whenReady().then(() => {
   createWindow();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+
+  // Тихая проверка обновлений при запуске (не мешает, если нет интернета).
+  setTimeout(() => checkForUpdates(false), 4000);
 });
 
 app.on('window-all-closed', () => {
@@ -291,6 +346,22 @@ ipcMain.handle('save-settings', (event, next) => {
   persistSettings(settings);
   BrowserWindow.getAllWindows().forEach((w) => applySpellcheck(w));
   return settings;
+});
+
+ipcMain.handle('get-app-version', () => app.getVersion());
+
+ipcMain.handle('check-for-updates', (event, manual) => checkForUpdates(manual));
+
+ipcMain.handle('start-update-download', async () => {
+  try {
+    await autoUpdater.downloadUpdate();
+  } catch (e) {
+    broadcast('update-error', { message: (e && e.message) || String(e) });
+  }
+});
+
+ipcMain.handle('quit-and-install', () => {
+  autoUpdater.quitAndInstall();
 });
 
 ipcMain.handle('choose-folder', async (event) => {

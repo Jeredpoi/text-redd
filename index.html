@@ -264,6 +264,10 @@
           <svg viewBox="0 0 20 20"><rect x="4" y="7" width="12" height="6" rx="1"/><rect x="6" y="2" width="8" height="5"/><rect x="6" y="13" width="8" height="5"/></svg>
           <span>Печать</span>
         </button>
+        <button class="pill-btn labeled" id="btnCheckUpdate" title="Проверить обновления">
+          <svg viewBox="0 0 20 20"><path d="M4 10a6 6 0 0 1 10.2-4.2M16 10a6 6 0 0 1-10.2 4.2"/><polyline points="14,2 14,6 10,6"/><polyline points="6,18 6,14 10,14"/></svg>
+          <span>Обновления</span>
+        </button>
         <span class="flex-spacer"></span>
         <button id="findToggleBtn3" class="pill-btn find-pill" title="Поиск и замена (Ctrl+F)">⌕ Найти</button>
         <button class="pill-btn icon-only" id="btnSettings" title="Настройки">
@@ -363,6 +367,24 @@
     </div>
   </div>
 
+  <div id="updateModal" class="modal-overlay hidden">
+    <div class="modal update-modal">
+      <div class="update-modal-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M5 21h14"/></svg>
+      </div>
+      <h3 id="updateModalTitle">Доступно обновление</h3>
+      <p id="updateModalMessage" class="modal-message"></p>
+      <div id="updateProgressWrap" class="update-progress-wrap hidden">
+        <div class="update-progress-track"><div id="updateProgressFill" class="update-progress-fill"></div></div>
+        <div id="updateProgressLabel" class="update-progress-label">0%</div>
+      </div>
+      <div class="modal-actions">
+        <button id="updateLaterBtn" class="btn-secondary">Позже</button>
+        <button id="updateActionBtn" class="btn-primary">Скачать и установить</button>
+      </div>
+    </div>
+  </div>
+
   <div id="settingsModal" class="modal-overlay hidden">
     <div class="modal settings-modal">
       <h3>Настройки</h3>
@@ -429,7 +451,10 @@
         <div class="settings-hint">Если папка выбрана, новые документы сохраняются в неё автоматически, без диалога «Сохранить как».</div>
       </div>
 
-      <div class="settings-about">Литера · версия 1.0.0</div>
+      <div class="settings-about">
+        <span id="settingsVersionText">Литера · версия 1.0.0</span>
+        <button id="settingsCheckUpdateBtn" class="link-btn" type="button">Проверить обновления</button>
+      </div>
 
       <div class="modal-actions">
         <button id="settingsCancelBtn" class="btn-secondary">Отмена</button>

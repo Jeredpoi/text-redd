@@ -22,6 +22,11 @@ contextBridge.exposeInMainWorld('api', {
   saveSettings: (s) => ipcRenderer.invoke('save-settings', s),
   chooseFolder: () => ipcRenderer.invoke('choose-folder'),
 
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+  checkForUpdates: (manual) => ipcRenderer.invoke('check-for-updates', manual),
+  startUpdateDownload: () => ipcRenderer.invoke('start-update-download'),
+  quitAndInstall: () => ipcRenderer.invoke('quit-and-install'),
+
   getRecentFiles: () => ipcRenderer.invoke('get-recent-files'),
   showRecentItemMenu: (filePath) => ipcRenderer.invoke('show-recent-item-menu', filePath),
   showTabContextMenu: (tabId) => ipcRenderer.invoke('show-tab-context-menu', tabId),
@@ -38,4 +43,10 @@ contextBridge.exposeInMainWorld('api', {
   onTabMenuNew: (cb) => ipcRenderer.on('tab-menu-new', cb),
   onTabMenuClose: (cb) => ipcRenderer.on('tab-menu-close', (e, id) => cb(id)),
   onTabMenuCloseOthers: (cb) => ipcRenderer.on('tab-menu-close-others', (e, id) => cb(id)),
+
+  onUpdateAvailable: (cb) => ipcRenderer.on('update-available', (e, info) => cb(info)),
+  onUpdateNotAvailable: (cb) => ipcRenderer.on('update-not-available', cb),
+  onUpdateDownloadProgress: (cb) => ipcRenderer.on('update-download-progress', (e, p) => cb(p)),
+  onUpdateDownloaded: (cb) => ipcRenderer.on('update-downloaded', (e, info) => cb(info)),
+  onUpdateError: (cb) => ipcRenderer.on('update-error', (e, err) => cb(err)),
 });

@@ -17,7 +17,8 @@
   },
   "dependencies": {
     "html-to-docx": "^1.8.0",
-    "mammoth": "^1.7.2"
+    "mammoth": "^1.7.2",
+    "electron-updater": "^6.8.9"
   },
   "build": {
     "appId": "com.maxim.litera",
@@ -52,6 +53,13 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Литера",
       "language": "1049"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "jeredpoi",
+        "repo": "text-redd"
+      }
+    ]
   }
 }

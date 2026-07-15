@@ -372,6 +372,93 @@ function showRecoveryModal(count) {
   });
 }
 
+// ---- Автообновление ----
+
+const updateModal = document.getElementById('updateModal');
+const updateModalMessageEl = document.getElementById('updateModalMessage');
+const updateProgressWrapEl = document.getElementById('updateProgressWrap');
+const updateProgressFillEl = document.getElementById('updateProgressFill');
+const updateProgressLabelEl = document.getElementById('updateProgressLabel');
+const updateLaterBtn = document.getElementById('updateLaterBtn');
+const updateActionBtn = document.getElementById('updateActionBtn');
+const settingsVersionTextEl = document.getElementById('settingsVersionText');
+
+let updateState = 'idle';
+
+function showUpdateAvailable(info) {
+  updateState = 'available';
+  updateModalMessageEl.textContent = `Вышла новая версия ${info.version}. Скачать и установить сейчас?`;
+  updateProgressWrapEl.classList.add('hidden');
+  updateActionBtn.disabled = false;
+  updateActionBtn.textContent = 'Скачать и установить';
+  updateLaterBtn.classList.remove('hidden');
+  updateLaterBtn.textContent = 'Позже';
+  updateModal.classList.remove('hidden');
+}
+
+function showUpdateDownloading() {
+  updateState = 'downloading';
+  updateModalMessageEl.textContent = 'Загрузка обновления…';
+  updateProgressWrapEl.classList.remove('hidden');
+  updateProgressFillEl.style.width = '0%';
+  updateProgressLabelEl.textContent = '0%';
+  updateActionBtn.disabled = true;
+  updateActionBtn.textContent = 'Загрузка…';
+  updateLaterBtn.classList.add('hidden');
+}
+
+function showUpdateDownloaded(info) {
+  updateState = 'downloaded';
+  updateModalMessageEl.textContent = `Обновление ${info.version} загружено и готово к установке.`;
+  updateProgressWrapEl.classList.add('hidden');
+  updateActionBtn.disabled = false;
+  updateActionBtn.textContent = 'Перезапустить и установить';
+  updateLaterBtn.classList.remove('hidden');
+  updateLaterBtn.textContent = 'Позже';
+  updateModal.classList.remove('hidden');
+}
+
+updateActionBtn.addEventListener('click', () => {
+  if (updateState === 'available') {
+    window.api.startUpdateDownload();
+    showUpdateDownloading();
+  } else if (updateState === 'downloaded') {
+    window.api.quitAndInstall();
+  }
+});
+
+updateLaterBtn.addEventListener('click', () => {
+  updateModal.classList.add('hidden');
+});
+
+window.api.onUpdateAvailable((info) => showUpdateAvailable(info));
+window.api.onUpdateDownloadProgress((p) => {
+  const pct = Math.round(p.percent || 0);
+  updateProgressFillEl.style.width = `${pct}%`;
+  updateProgressLabelEl.textContent = `${pct}%`;
+});
+window.api.onUpdateDownloaded((info) => showUpdateDownloaded(info));
+window.api.onUpdateNotAvailable(() => showToast('У вас уже установлена последняя версия.'));
+window.api.onUpdateError((err) => showToast(`Не удалось проверить обновления: ${(err && err.message) || 'ошибка сети'}`));
+
+document.getElementById('btnCheckUpdate').addEventListener('click', () => {
+  window.api.checkForUpdates(true);
+  showToast('Проверка обновлений…');
+});
+
+document.getElementById('settingsCheckUpdateBtn').addEventListener('click', () => {
+  closeSettingsModal();
+  window.api.checkForUpdates(true);
+  showToast('Проверка обновлений…');
+});
+
+async function initAppVersion() {
+  try {
+    const version = await window.api.getAppVersion();
+    settingsVersionTextEl.textContent = `Литера · версия ${version}`;
+  } catch (e) {}
+}
+
 // ---- Автосохранение ----
 
 function restartAutosaveTimer() {
@@ -1254,6 +1341,7 @@ document.addEventListener('keydown', (e) => {
 async function init() {
   settings = await window.api.getSettings();
   applyTheme(settings.theme === 'dark');
+  initAppVersion();
 
   const recoveries = await window.api.listRecoveries();
   if (recoveries.length > 0) {
