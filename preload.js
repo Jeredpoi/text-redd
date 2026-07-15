@@ -10,8 +10,10 @@ contextBridge.exposeInMainWorld('api', {
   insertImageDialog: () => ipcRenderer.invoke('insert-image-dialog'),
   setDirty: (dirty) => ipcRenderer.invoke('dirty-state', dirty),
   setTheme: (theme) => ipcRenderer.invoke('set-theme', theme),
+  getRecentFiles: () => ipcRenderer.invoke('get-recent-files'),
 
   onApplyTheme: (cb) => ipcRenderer.on('apply-theme', (e, theme) => cb(theme)),
+  onRecentFilesChanged: (cb) => ipcRenderer.on('recent-files-changed', cb),
   onMenuNew: (cb) => ipcRenderer.on('menu-new', cb),
   onMenuOpen: (cb) => ipcRenderer.on('menu-open', cb),
   onMenuOpenPath: (cb) => ipcRenderer.on('menu-open-path', (e, p) => cb(p)),

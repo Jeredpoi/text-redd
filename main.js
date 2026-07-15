@@ -25,6 +25,7 @@ function addRecentFile(filePath) {
   list.unshift(filePath);
   saveRecentFiles(list);
   buildMenu();
+  BrowserWindow.getAllWindows().forEach((w) => w.webContents.send('recent-files-changed'));
 }
 
 function focusedWindow() {
@@ -243,6 +244,8 @@ ipcMain.handle('set-theme', (event, theme) => {
 });
 
 // ---- IPC: файловые операции ----
+
+ipcMain.handle('get-recent-files', () => loadRecentFiles());
 
 ipcMain.handle('dirty-state', (event, dirty) => {
   const win = BrowserWindow.fromWebContents(event.sender);
