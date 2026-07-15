@@ -36,12 +36,20 @@ if errorlevel 1 (
   goto :error
 )
 
+set CSC_IDENTITY_AUTO_DISCOVERY=false
+
 echo.
 echo Building installer ^(NSIS .exe^)...
 call npm run dist
 if errorlevel 1 (
   echo.
   echo [Error] Building the installer failed. See the messages above.
+  echo.
+  echo If the error mentions "symbolic link" or "privilege", Windows is
+  echo blocking creation of symlinks for a helper tool. Fix one of two ways:
+  echo   1^) Turn ON Developer Mode: Settings ^> Privacy ^& security ^>
+  echo      For developers ^> Developer Mode, then run this file again.
+  echo   2^) Or right-click this file and choose "Run as administrator".
   goto :error
 )
 
