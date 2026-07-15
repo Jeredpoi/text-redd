@@ -664,27 +664,73 @@ document.querySelectorAll('[data-cmd]').forEach((btn) => {
   });
 });
 
+// Native <select>/<input> controls steal focus, and Chromium's execCommand
+// silently no-ops afterwards even once the selection is programmatically
+// restored (verified empirically — restoring focus/selection is not enough).
+// So for these controls we bypass execCommand and apply the style directly
+// to the saved range by walking its text nodes and wrapping each in a span.
+function applyInlineStyleToRange(range, applyStyle) {
+  if (!range || range.collapsed) return false;
+  const root = range.commonAncestorContainer.nodeType === 3
+    ? range.commonAncestorContainer.parentNode
+    : range.commonAncestorContainer;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode: (node) => (range.intersectsNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT),
+  });
+  const nodes = [];
+  let n;
+  while ((n = walker.nextNode())) nodes.push(n);
+  let applied = false;
+  nodes.forEach((textNode) => {
+    let start = 0;
+    let end = textNode.length;
+    if (textNode === range.startContainer) start = range.startOffset;
+    if (textNode === range.endContainer) end = range.endOffset;
+    if (start >= end) return;
+    const full = textNode.textContent;
+    const before = full.slice(0, start);
+    const middle = full.slice(start, end);
+    const after = full.slice(end);
+    if (!middle) return;
+    const span = document.createElement('span');
+    applyStyle(span);
+    span.textContent = middle;
+    const frag = document.createDocumentFragment();
+    if (before) frag.appendChild(document.createTextNode(before));
+    frag.appendChild(span);
+    if (after) frag.appendChild(document.createTextNode(after));
+    textNode.parentNode.replaceChild(frag, textNode);
+    applied = true;
+  });
+  return applied;
+}
+
 const fontNameSelectEl = document.getElementById('fontName');
-// Native <select>/<input> controls steal focus and can drop the editor's
-// selection before the "change" event fires, so we must capture the range
-// on mousedown/focus and restore it explicitly — same pattern as modals.
 fontNameSelectEl.addEventListener('mousedown', saveSelection);
 fontNameSelectEl.addEventListener('change', (e) => {
-  restoreSelection();
-  document.execCommand('fontName', false, e.target.value);
+  const applied = applyInlineStyleToRange(savedRange, (span) => {
+    span.style.fontFamily = e.target.value;
+  });
+  editor.focus();
+  if (!applied) document.execCommand('fontName', false, e.target.value);
   markActiveDirty();
   scheduleAutosave();
 });
 
 function setFontSizePx(px) {
-  restoreSelection();
-  document.execCommand('fontSize', false, '7');
-  Array.from(editor.querySelectorAll('font[size="7"]')).forEach((el) => {
-    const span = document.createElement('span');
+  const applied = applyInlineStyleToRange(savedRange, (span) => {
     span.style.fontSize = `${px}px`;
-    while (el.firstChild) span.appendChild(el.firstChild);
-    el.replaceWith(span);
   });
+  editor.focus();
+  if (!applied) {
+    document.execCommand('fontSize', false, '7');
+    Array.from(editor.querySelectorAll('font[size="7"]')).forEach((el) => {
+      const span = document.createElement('span');
+      span.style.fontSize = `${px}px`;
+      while (el.firstChild) span.appendChild(el.firstChild);
+      el.replaceWith(span);
+    });
+  }
   markActiveDirty();
   updateStats();
   scheduleAutosave();
@@ -807,12 +853,33 @@ document.addEventListener('mousedown', (e) => {
   if (!e.target.closest('[data-color-wrap]')) closeColorDropdowns();
 });
 
-document.getElementById('foreColorCustomInput').addEventListener('input', (e) => {
-  applyForeColor(e.target.value);
+// The native color-picker dialog opened by <input type="color"> steals focus
+// even more thoroughly than a <select>, so applyForeColor/applyHiliteColor's
+// execCommand call never has anything to act on here — apply directly instead.
+const foreColorCustomInputEl = document.getElementById('foreColorCustomInput');
+foreColorCustomInputEl.addEventListener('mousedown', saveSelection);
+foreColorCustomInputEl.addEventListener('input', (e) => {
+  const c = e.target.value;
+  const applied = applyInlineStyleToRange(savedRange, (span) => { span.style.color = c; });
+  editor.focus();
+  if (!applied) document.execCommand('foreColor', false, c);
+  document.getElementById('foreColorBar').style.background = c;
+  markActiveDirty();
+  scheduleAutosave();
   closeColorDropdowns();
 });
-document.getElementById('hiliteColorCustomInput').addEventListener('input', (e) => {
-  applyHiliteColor(e.target.value);
+
+const hiliteColorCustomInputEl = document.getElementById('hiliteColorCustomInput');
+hiliteColorCustomInputEl.addEventListener('mousedown', saveSelection);
+hiliteColorCustomInputEl.addEventListener('input', (e) => {
+  const c = e.target.value;
+  const applied = applyInlineStyleToRange(savedRange, (span) => { span.style.backgroundColor = c; });
+  editor.focus();
+  if (!applied) document.execCommand('hiliteColor', false, c);
+  lastHiliteColor = c;
+  document.getElementById('hiliteColorBar').style.background = c;
+  markActiveDirty();
+  scheduleAutosave();
   closeColorDropdowns();
 });
 
