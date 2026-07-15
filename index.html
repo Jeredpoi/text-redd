@@ -6,58 +6,130 @@
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <div id="toolbar">
-    <select id="fontName" title="Шрифт">
-      <option value="Calibri">Calibri</option>
-      <option value="Arial">Arial</option>
-      <option value="Georgia">Georgia</option>
-      <option value="Times New Roman">Times New Roman</option>
-      <option value="Courier New">Courier New</option>
-      <option value="Verdana">Verdana</option>
-    </select>
-    <select id="fontSize" title="Размер шрифта">
-      <option value="1">8</option>
-      <option value="2">10</option>
-      <option value="3" selected>12</option>
-      <option value="4">14</option>
-      <option value="5">18</option>
-      <option value="6">24</option>
-      <option value="7">36</option>
-    </select>
-    <span class="sep"></span>
-    <select id="blockFormat" title="Стиль абзаца">
-      <option value="p">Обычный текст</option>
-      <option value="h1">Заголовок 1</option>
-      <option value="h2">Заголовок 2</option>
-      <option value="h3">Заголовок 3</option>
-      <option value="blockquote">Цитата</option>
-      <option value="pre">Код</option>
-    </select>
-    <span class="sep"></span>
-    <button data-cmd="bold" title="Жирный (Ctrl+B)"><b>Ж</b></button>
-    <button data-cmd="italic" title="Курсив (Ctrl+I)"><i>К</i></button>
-    <button data-cmd="underline" title="Подчёркнутый (Ctrl+U)"><u>Ч</u></button>
-    <button data-cmd="strikeThrough" title="Зачёркнутый"><s>Ы</s></button>
-    <span class="sep"></span>
-    <input type="color" id="foreColor" title="Цвет текста" value="#000000" />
-    <input type="color" id="hiliteColor" title="Цвет выделения" value="#ffff00" />
-    <span class="sep"></span>
-    <button data-cmd="justifyLeft" title="По левому краю">⯇</button>
-    <button data-cmd="justifyCenter" title="По центру">☰</button>
-    <button data-cmd="justifyRight" title="По правому краю">⯈</button>
-    <button data-cmd="justifyFull" title="По ширине">▤</button>
-    <span class="sep"></span>
-    <button data-cmd="insertUnorderedList" title="Маркированный список">• —</button>
-    <button data-cmd="insertOrderedList" title="Нумерованный список">1.—</button>
-    <button data-cmd="outdent" title="Уменьшить отступ">⇤</button>
-    <button data-cmd="indent" title="Увеличить отступ">⇥</button>
-    <span class="sep"></span>
-    <button id="btnTable" title="Вставить таблицу">▦</button>
-    <button id="btnLink" title="Вставить ссылку">🔗</button>
-    <button id="btnImage" title="Вставить изображение">🖼</button>
-    <button id="btnHr" title="Горизонтальная линия">—</button>
-    <span class="sep"></span>
-    <button data-cmd="removeFormat" title="Очистить форматирование">✕</button>
+  <div id="ribbon">
+    <div class="ribbon-tabs" role="tablist">
+      <button class="ribbon-tab active" data-target="ribbon-home" role="tab">Главная</button>
+      <button class="ribbon-tab" data-target="ribbon-insert" role="tab">Вставка</button>
+      <button class="ribbon-tab" data-target="ribbon-view" role="tab">Вид</button>
+    </div>
+
+    <div id="ribbon-home" class="ribbon-panel active">
+      <div class="ribbon-group">
+        <div class="group-row">
+          <select id="fontName" title="Шрифт">
+            <option value="Calibri">Calibri</option>
+            <option value="Arial">Arial</option>
+            <option value="Georgia">Georgia</option>
+            <option value="Times New Roman">Times New Roman</option>
+            <option value="Courier New">Courier New</option>
+            <option value="Verdana">Verdana</option>
+          </select>
+          <select id="fontSize" title="Размер шрифта">
+            <option value="1">8</option>
+            <option value="2">10</option>
+            <option value="3" selected>12</option>
+            <option value="4">14</option>
+            <option value="5">18</option>
+            <option value="6">24</option>
+            <option value="7">36</option>
+          </select>
+        </div>
+        <div class="group-row">
+          <button class="fmt-btn" data-cmd="bold" title="Жирный (Ctrl+B)"><b>Ж</b></button>
+          <button class="fmt-btn" data-cmd="italic" title="Курсив (Ctrl+I)"><i>К</i></button>
+          <button class="fmt-btn" data-cmd="underline" title="Подчёркнутый (Ctrl+U)"><u>Ч</u></button>
+          <button class="fmt-btn" data-cmd="strikeThrough" title="Зачёркнутый"><s>Ы</s></button>
+          <label class="color-btn" title="Цвет текста">
+            <span>А</span><span class="color-bar" id="foreColorBar"></span>
+            <input type="color" id="foreColor" value="#000000" />
+          </label>
+          <label class="color-btn" title="Цвет выделения">
+            <svg viewBox="0 0 20 20" width="14" height="14"><rect x="3" y="8" width="14" height="6" rx="2" fill="currentColor"/></svg>
+            <span class="color-bar" id="hiliteColorBar"></span>
+            <input type="color" id="hiliteColor" value="#ffff00" />
+          </label>
+        </div>
+        <span class="group-label">Шрифт</span>
+      </div>
+
+      <div class="ribbon-group">
+        <div class="group-row">
+          <select id="blockFormat" title="Стиль абзаца">
+            <option value="p">Обычный текст</option>
+            <option value="h1">Заголовок 1</option>
+            <option value="h2">Заголовок 2</option>
+            <option value="h3">Заголовок 3</option>
+            <option value="blockquote">Цитата</option>
+            <option value="pre">Код</option>
+          </select>
+        </div>
+        <div class="group-row">
+          <button class="icon-btn" data-cmd="justifyLeft" title="По левому краю">
+            <svg viewBox="0 0 20 20"><line x1="3" y1="5" x2="17" y2="5"/><line x1="3" y1="9" x2="12" y2="9"/><line x1="3" y1="13" x2="17" y2="13"/><line x1="3" y1="17" x2="10" y2="17"/></svg>
+          </button>
+          <button class="icon-btn" data-cmd="justifyCenter" title="По центру">
+            <svg viewBox="0 0 20 20"><line x1="3" y1="5" x2="17" y2="5"/><line x1="6" y1="9" x2="14" y2="9"/><line x1="3" y1="13" x2="17" y2="13"/><line x1="5" y1="17" x2="15" y2="17"/></svg>
+          </button>
+          <button class="icon-btn" data-cmd="justifyRight" title="По правому краю">
+            <svg viewBox="0 0 20 20"><line x1="3" y1="5" x2="17" y2="5"/><line x1="8" y1="9" x2="17" y2="9"/><line x1="3" y1="13" x2="17" y2="13"/><line x1="10" y1="17" x2="17" y2="17"/></svg>
+          </button>
+          <button class="icon-btn" data-cmd="justifyFull" title="По ширине">
+            <svg viewBox="0 0 20 20"><line x1="3" y1="5" x2="17" y2="5"/><line x1="3" y1="9" x2="17" y2="9"/><line x1="3" y1="13" x2="17" y2="13"/><line x1="3" y1="17" x2="17" y2="17"/></svg>
+          </button>
+          <button class="icon-btn" data-cmd="insertUnorderedList" title="Маркированный список">
+            <svg viewBox="0 0 20 20"><circle cx="4" cy="5" r="1.3" fill="currentColor" stroke="none"/><line x1="8" y1="5" x2="17" y2="5"/><circle cx="4" cy="10" r="1.3" fill="currentColor" stroke="none"/><line x1="8" y1="10" x2="17" y2="10"/><circle cx="4" cy="15" r="1.3" fill="currentColor" stroke="none"/><line x1="8" y1="15" x2="17" y2="15"/></svg>
+          </button>
+          <button class="icon-btn" data-cmd="insertOrderedList" title="Нумерованный список">
+            <svg viewBox="0 0 20 20"><text x="1.5" y="7" font-size="6" fill="currentColor" stroke="none">1</text><line x1="8" y1="5" x2="17" y2="5"/><text x="1.5" y="12" font-size="6" fill="currentColor" stroke="none">2</text><line x1="8" y1="10" x2="17" y2="10"/><text x="1.5" y="17" font-size="6" fill="currentColor" stroke="none">3</text><line x1="8" y1="15" x2="17" y2="15"/></svg>
+          </button>
+          <button class="icon-btn" data-cmd="outdent" title="Уменьшить отступ">
+            <svg viewBox="0 0 20 20"><line x1="9" y1="4" x2="17" y2="4"/><line x1="9" y1="16" x2="17" y2="16"/><line x1="9" y1="10" x2="17" y2="10"/><polyline points="8,7 4,10 8,13"/></svg>
+          </button>
+          <button class="icon-btn" data-cmd="indent" title="Увеличить отступ">
+            <svg viewBox="0 0 20 20"><line x1="3" y1="4" x2="17" y2="4"/><line x1="3" y1="16" x2="17" y2="16"/><line x1="9" y1="10" x2="17" y2="10"/><polyline points="4,7 8,10 4,13"/></svg>
+          </button>
+          <button class="icon-btn" data-cmd="removeFormat" title="Очистить форматирование">
+            <svg viewBox="0 0 20 20"><text x="2" y="15" font-size="13" fill="currentColor" stroke="none">A</text><line x1="3" y1="17" x2="16" y2="4"/></svg>
+          </button>
+        </div>
+        <span class="group-label">Абзац</span>
+      </div>
+    </div>
+
+    <div id="ribbon-insert" class="ribbon-panel">
+      <div class="ribbon-group">
+        <div class="group-row">
+          <button class="icon-btn big" id="btnTable" title="Вставить таблицу">
+            <svg viewBox="0 0 20 20"><rect x="3" y="3" width="14" height="14" rx="1.5"/><line x1="3" y1="8" x2="17" y2="8"/><line x1="3" y1="13" x2="17" y2="13"/><line x1="8" y1="3" x2="8" y2="17"/><line x1="13" y1="3" x2="13" y2="17"/></svg>
+            <span>Таблица</span>
+          </button>
+          <button class="icon-btn big" id="btnLink" title="Вставить ссылку">
+            <svg viewBox="0 0 20 20"><circle cx="7" cy="13" r="3.2"/><circle cx="13" cy="7" r="3.2"/><line x1="9" y1="11" x2="11" y2="9"/></svg>
+            <span>Ссылка</span>
+          </button>
+          <button class="icon-btn big" id="btnImage" title="Вставить изображение">
+            <svg viewBox="0 0 20 20"><rect x="3" y="4" width="14" height="12" rx="1.5"/><circle cx="7.5" cy="8.5" r="1.4" fill="currentColor" stroke="none"/><polyline points="4,15 8,10.5 11,13 13,10.5 16,14"/></svg>
+            <span>Изображение</span>
+          </button>
+          <button class="icon-btn big" id="btnHr" title="Горизонтальная линия">
+            <svg viewBox="0 0 20 20"><line x1="3" y1="10" x2="17" y2="10" stroke-width="2.4"/></svg>
+            <span>Линия</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="ribbon-view" class="ribbon-panel">
+      <div class="ribbon-group">
+        <div class="group-row">
+          <label class="theme-switch">
+            <input type="checkbox" id="themeToggle" />
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+            <span>Тёмная тема</span>
+          </label>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div id="findBar" class="hidden">
@@ -66,7 +138,7 @@
     <button id="findNextBtn">Найти далее</button>
     <button id="replaceBtn">Заменить</button>
     <button id="replaceAllBtn">Заменить всё</button>
-    <button id="closeFindBtn">✕</button>
+    <button id="closeFindBtn" class="icon-close">✕</button>
   </div>
 
   <div id="editorWrap">
@@ -78,6 +150,37 @@
     <span id="stats">Слов: 0 · Символов: 0</span>
     <span id="savedState">Сохранено</span>
   </div>
+
+  <div id="tableModal" class="modal-overlay hidden">
+    <div class="modal">
+      <h3>Вставить таблицу</h3>
+      <label class="modal-field">Строки
+        <input type="number" id="tableRows" min="1" max="50" value="3" />
+      </label>
+      <label class="modal-field">Столбцы
+        <input type="number" id="tableCols" min="1" max="20" value="3" />
+      </label>
+      <div class="modal-actions">
+        <button id="tableCancelBtn" class="btn-secondary">Отмена</button>
+        <button id="tableOkBtn" class="btn-primary">Вставить</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="linkModal" class="modal-overlay hidden">
+    <div class="modal">
+      <h3>Вставить ссылку</h3>
+      <label class="modal-field">Адрес (URL)
+        <input type="text" id="linkUrl" placeholder="https://example.com" />
+      </label>
+      <div class="modal-actions">
+        <button id="linkCancelBtn" class="btn-secondary">Отмена</button>
+        <button id="linkOkBtn" class="btn-primary">Вставить</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
 
   <script src="renderer.js"></script>
 </body>

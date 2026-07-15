@@ -24,9 +24,20 @@ editor.addEventListener('input', () => {
   updateStats();
 });
 
-// ---- Панель инструментов ----
+// ---- Вкладки ленты ----
 
-document.querySelectorAll('#toolbar button[data-cmd]').forEach((btn) => {
+document.querySelectorAll('.ribbon-tab').forEach((tab) => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.ribbon-tab').forEach((t) => t.classList.remove('active'));
+    document.querySelectorAll('.ribbon-panel').forEach((p) => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById(tab.dataset.target).classList.add('active');
+  });
+});
+
+// ---- Панель форматирования ----
+
+document.querySelectorAll('[data-cmd]').forEach((btn) => {
   btn.addEventListener('click', () => {
     editor.focus();
     document.execCommand(btn.dataset.cmd, false, null);
@@ -52,15 +63,17 @@ document.getElementById('blockFormat').addEventListener('change', (e) => {
 document.getElementById('foreColor').addEventListener('input', (e) => {
   editor.focus();
   document.execCommand('foreColor', false, e.target.value);
+  document.getElementById('foreColorBar').style.background = e.target.value;
 });
 
 document.getElementById('hiliteColor').addEventListener('input', (e) => {
   editor.focus();
   document.execCommand('hiliteColor', false, e.target.value);
+  document.getElementById('hiliteColorBar').style.background = e.target.value;
 });
 
 function updateToolbarState() {
-  document.querySelectorAll('#toolbar button[data-cmd]').forEach((btn) => {
+  document.querySelectorAll('[data-cmd]').forEach((btn) => {
     try {
       const active = document.queryCommandState(btn.dataset.cmd);
       btn.classList.toggle('active', active);
@@ -71,12 +84,108 @@ function updateToolbarState() {
 editor.addEventListener('keyup', updateToolbarState);
 editor.addEventListener('mouseup', updateToolbarState);
 
-// ---- Вставка: таблица, ссылка, изображение, линия ----
+// ---- Тема ----
+
+const themeToggle = document.getElementById('themeToggle');
+
+function setTheme(dark) {
+  document.body.classList.toggle('dark', dark);
+  themeToggle.checked = dark;
+  window.api.setTheme(dark ? 'dark' : 'light');
+}
+
+themeToggle.addEventListener('change', () => setTheme(themeToggle.checked));
+window.api.onMenuToggleTheme(() => setTheme(!document.body.classList.contains('dark')));
+window.api.onApplyTheme((theme) => setTheme(theme === 'dark'));
+
+// ---- Уведомления (тост) ----
+
+const toastEl = document.getElementById('toast');
+let toastTimer = null;
+
+function showToast(message) {
+  toastEl.textContent = message;
+  toastEl.classList.remove('hidden');
+  requestAnimationFrame(() => toastEl.classList.add('show'));
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    toastEl.classList.remove('show');
+    setTimeout(() => toastEl.classList.add('hidden'), 200);
+  }, 2000);
+}
+
+// ---- Сохранение и восстановление выделения при открытии диалогов ----
+
+let savedRange = null;
+
+function saveSelection() {
+  const sel = window.getSelection();
+  if (sel.rangeCount > 0 && editor.contains(sel.anchorNode)) {
+    savedRange = sel.getRangeAt(0).cloneRange();
+  } else {
+    savedRange = null;
+  }
+}
+
+function restoreSelection() {
+  editor.focus();
+  if (savedRange) {
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(savedRange);
+  }
+}
+
+function openModal(modal) {
+  saveSelection();
+  modal.classList.remove('hidden');
+}
+
+function closeModal(modal) {
+  modal.classList.add('hidden');
+}
+
+function wireModalKeys(modal, okBtn, cancelBtn) {
+  modal.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
+      okBtn.click();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      cancelBtn.click();
+    }
+  });
+  modal.addEventListener('mousedown', (e) => {
+    if (e.target === modal) cancelBtn.click();
+  });
+}
+
+// ---- Вставка: таблица ----
+
+const tableModal = document.getElementById('tableModal');
+const tableRowsInput = document.getElementById('tableRows');
+const tableColsInput = document.getElementById('tableCols');
+const tableOkBtn = document.getElementById('tableOkBtn');
+const tableCancelBtn = document.getElementById('tableCancelBtn');
+
+wireModalKeys(tableModal, tableOkBtn, tableCancelBtn);
 
 document.getElementById('btnTable').addEventListener('click', () => {
-  const rows = parseInt(prompt('Количество строк:', '3'), 10);
-  const cols = parseInt(prompt('Количество столбцов:', '3'), 10);
-  if (!rows || !cols) return;
+  tableRowsInput.value = 3;
+  tableColsInput.value = 3;
+  openModal(tableModal);
+  tableRowsInput.focus();
+  tableRowsInput.select();
+});
+
+tableCancelBtn.addEventListener('click', () => closeModal(tableModal));
+
+tableOkBtn.addEventListener('click', () => {
+  const rows = Math.max(1, Math.min(50, parseInt(tableRowsInput.value, 10) || 0));
+  const cols = Math.max(1, Math.min(20, parseInt(tableColsInput.value, 10) || 0));
+  closeModal(tableModal);
   let html = '<table>';
   for (let r = 0; r < rows; r++) {
     html += '<tr>';
@@ -84,23 +193,45 @@ document.getElementById('btnTable').addEventListener('click', () => {
     html += '</tr>';
   }
   html += '</table><p></p>';
-  editor.focus();
+  restoreSelection();
   document.execCommand('insertHTML', false, html);
   setDirty(true);
 });
 
+// ---- Вставка: ссылка ----
+
+const linkModal = document.getElementById('linkModal');
+const linkUrlInput = document.getElementById('linkUrl');
+const linkOkBtn = document.getElementById('linkOkBtn');
+const linkCancelBtn = document.getElementById('linkCancelBtn');
+
+wireModalKeys(linkModal, linkOkBtn, linkCancelBtn);
+
 document.getElementById('btnLink').addEventListener('click', () => {
-  const url = prompt('Введите URL ссылки:', 'https://');
+  linkUrlInput.value = 'https://';
+  openModal(linkModal);
+  linkUrlInput.focus();
+  linkUrlInput.select();
+});
+
+linkCancelBtn.addEventListener('click', () => closeModal(linkModal));
+
+linkOkBtn.addEventListener('click', () => {
+  const url = linkUrlInput.value.trim();
+  closeModal(linkModal);
   if (!url) return;
-  editor.focus();
+  restoreSelection();
   document.execCommand('createLink', false, url);
   setDirty(true);
 });
 
+// ---- Вставка: изображение, линия ----
+
 document.getElementById('btnImage').addEventListener('click', async () => {
+  saveSelection();
   const dataUrl = await window.api.insertImageDialog();
   if (!dataUrl) return;
-  editor.focus();
+  restoreSelection();
   document.execCommand('insertHTML', false, `<img src="${dataUrl}" />`);
   setDirty(true);
 });
@@ -173,10 +304,6 @@ window.api.onMenuSaveAs(saveDocAs);
 window.api.onMenuExportPdf(exportPdf);
 window.api.onMenuExportDocx(exportDocx);
 
-window.api.onMenuToggleTheme(() => {
-  document.body.classList.toggle('dark');
-});
-
 window.api.onMenuInsertTable(() => document.getElementById('btnTable').click());
 window.api.onMenuInsertLink(() => document.getElementById('btnLink').click());
 window.api.onMenuInsertImage(() => document.getElementById('btnImage').click());
@@ -203,7 +330,7 @@ document.getElementById('findNextBtn').addEventListener('click', () => {
   const term = findInput.value;
   if (!term) return;
   const found = window.find(term);
-  if (!found) alert('Совпадений больше нет.');
+  if (!found) showToast('Совпадений больше нет.');
 });
 
 document.getElementById('replaceBtn').addEventListener('click', () => {
