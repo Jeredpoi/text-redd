@@ -1,7 +1,7 @@
 {
   "name": "litera",
   "productName": "Литера",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Текстовый редактор с богатым форматированием и проверкой орфографии (RU/EN)",
   "main": "main.js",
   "author": "Максим",
