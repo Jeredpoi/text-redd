@@ -664,15 +664,20 @@ document.querySelectorAll('[data-cmd]').forEach((btn) => {
   });
 });
 
-document.getElementById('fontName').addEventListener('change', (e) => {
-  editor.focus();
+const fontNameSelectEl = document.getElementById('fontName');
+// Native <select>/<input> controls steal focus and can drop the editor's
+// selection before the "change" event fires, so we must capture the range
+// on mousedown/focus and restore it explicitly — same pattern as modals.
+fontNameSelectEl.addEventListener('mousedown', saveSelection);
+fontNameSelectEl.addEventListener('change', (e) => {
+  restoreSelection();
   document.execCommand('fontName', false, e.target.value);
   markActiveDirty();
   scheduleAutosave();
 });
 
 function setFontSizePx(px) {
-  editor.focus();
+  restoreSelection();
   document.execCommand('fontSize', false, '7');
   Array.from(editor.querySelectorAll('font[size="7"]')).forEach((el) => {
     const span = document.createElement('span');
@@ -685,14 +690,18 @@ function setFontSizePx(px) {
   scheduleAutosave();
 }
 
-document.getElementById('fontSize').addEventListener('change', (e) => {
+const fontSizeInputEl = document.getElementById('fontSize');
+fontSizeInputEl.addEventListener('focus', saveSelection);
+fontSizeInputEl.addEventListener('change', (e) => {
   const px = Math.max(1, Math.min(400, parseInt(e.target.value, 10) || 12));
   e.target.value = px;
   setFontSizePx(px);
 });
 
-document.getElementById('blockFormat').addEventListener('change', (e) => {
-  editor.focus();
+const blockFormatEl = document.getElementById('blockFormat');
+blockFormatEl.addEventListener('mousedown', saveSelection);
+blockFormatEl.addEventListener('change', (e) => {
+  restoreSelection();
   document.execCommand('formatBlock', false, e.target.value);
   markActiveDirty();
   scheduleAutosave();
