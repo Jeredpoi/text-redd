@@ -81,6 +81,7 @@ function loadTabIntoDOM(tab) {
   setDirtyUI(tab.isDirty);
   updateStats();
   computeOutline();
+  applyFontControlsFromNode(editor.firstElementChild || editor, false);
 }
 
 function updateWindowTitle() {
@@ -291,21 +292,36 @@ async function closeOtherTabs(keepId) {
   }
 }
 
+const closeAppConfirmModal = document.getElementById('closeAppConfirmModal');
+const closeAppConfirmMessageEl = document.getElementById('closeAppConfirmMessage');
+const closeAppCancelBtn = document.getElementById('closeAppCancelBtn');
+const closeAppConfirmBtn = document.getElementById('closeAppConfirmBtn');
+
+function showCloseAppConfirmModal(names) {
+  return new Promise((resolve) => {
+    closeAppConfirmMessageEl.textContent = `Есть несохранённые изменения в: ${names}. Вы уверены, что хотите закрыть? Данные могут быть потеряны.`;
+    closeAppConfirmModal.classList.remove('hidden');
+    function cleanup(result) {
+      closeAppConfirmModal.classList.add('hidden');
+      closeAppCancelBtn.removeEventListener('click', onCancel);
+      closeAppConfirmBtn.removeEventListener('click', onConfirm);
+      resolve(result);
+    }
+    function onCancel() { cleanup(false); }
+    function onConfirm() { cleanup(true); }
+    closeAppCancelBtn.addEventListener('click', onCancel);
+    closeAppConfirmBtn.addEventListener('click', onConfirm);
+  });
+}
+
 async function confirmCloseAllTabs() {
   captureActiveTabFromDOM();
   const dirtyList = tabs.filter((t) => t.isDirty);
-  for (const tab of dirtyList) {
-    if (tab.id !== activeTabId) switchToTab(tab.id);
-    const choice = await showCloseConfirmModal(displayName(tab));
-    if (choice === 'cancel') return false;
-    if (choice === 'save') {
-      const ok = await saveActiveTab();
-      if (!ok) return false;
-    } else {
-      tab.isDirty = false;
-      window.api.clearRecovery(tab.recoveryId);
-    }
-  }
+  if (dirtyList.length === 0) return true;
+  const names = dirtyList.map((t) => displayName(t)).join(', ');
+  const proceed = await showCloseAppConfirmModal(names);
+  if (!proceed) return false;
+  dirtyList.forEach((tab) => window.api.clearRecovery(tab.recoveryId));
   return true;
 }
 
@@ -835,6 +851,33 @@ document.getElementById('btnClearFormatEdit').addEventListener('click', () => {
   scheduleAutosave();
 });
 
+function applyFontControlsFromNode(node, useCommandValue) {
+  if (!node) return;
+  const fontNameSelect = document.getElementById('fontName');
+  const fontSizeInput = document.getElementById('fontSize');
+  const computed = window.getComputedStyle(node);
+
+  let clean = '';
+  if (useCommandValue) {
+    try {
+      const fn = document.queryCommandValue('fontName');
+      clean = (fn || '').replace(/^["']|["']$/g, '').split(',')[0].trim();
+    } catch (e) {}
+  }
+  // queryCommandValue возвращает пустую строку, если к тексту ни разу не
+  // применяли execCommand('fontName') явно (свежий текст, загруженный файл) —
+  // в этом случае берём реально отображаемый шрифт из вычисленного стиля.
+  if (!clean) {
+    clean = (computed.fontFamily || '').split(',')[0].replace(/^["']|["']$/g, '').trim();
+  }
+  if (clean && [...fontNameSelect.options].some((o) => o.value.toLowerCase() === clean.toLowerCase())) {
+    fontNameSelect.value = clean;
+  }
+
+  const size = parseInt(computed.fontSize, 10);
+  if (size) fontSizeInput.value = size;
+}
+
 function syncFontControls() {
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0) return;
@@ -842,18 +885,7 @@ function syncFontControls() {
   if (!node || !editor.contains(node)) return;
   if (node.nodeType === 3) node = node.parentElement;
   if (!node) return;
-
-  try {
-    const fn = document.queryCommandValue('fontName');
-    const clean = (fn || '').replace(/^["']|["']$/g, '').split(',')[0].trim();
-    const fontNameSelect = document.getElementById('fontName');
-    if (clean && [...fontNameSelect.options].some((o) => o.value.toLowerCase() === clean.toLowerCase())) {
-      fontNameSelect.value = clean;
-    }
-  } catch (e) {}
-
-  const size = parseInt(window.getComputedStyle(node).fontSize, 10);
-  if (size) document.getElementById('fontSize').value = size;
+  applyFontControlsFromNode(node, true);
 }
 
 function updateToolbarState() {
@@ -1169,9 +1201,44 @@ async function openPath(p) {
   openLoadedFileAsTab(res);
 }
 
+const saveFolderPromptModal = document.getElementById('saveFolderPromptModal');
+const saveFolderSkipBtn = document.getElementById('saveFolderSkipBtn');
+const saveFolderChooseBtn = document.getElementById('saveFolderChooseBtn');
+
+function showSaveFolderPromptModal() {
+  return new Promise((resolve) => {
+    saveFolderPromptModal.classList.remove('hidden');
+    function cleanup(result) {
+      saveFolderPromptModal.classList.add('hidden');
+      saveFolderSkipBtn.removeEventListener('click', onSkip);
+      saveFolderChooseBtn.removeEventListener('click', onChoose);
+      resolve(result);
+    }
+    function onSkip() { cleanup(false); }
+    function onChoose() { cleanup(true); }
+    saveFolderSkipBtn.addEventListener('click', onSkip);
+    saveFolderChooseBtn.addEventListener('click', onChoose);
+  });
+}
+
+async function ensureDefaultSaveFolder() {
+  if (settings.defaultSaveFolder || settings.askedSaveFolder) return;
+  const wantsToChoose = await showSaveFolderPromptModal();
+  if (wantsToChoose) {
+    const folder = await window.api.chooseFolder();
+    if (folder) {
+      settings = await window.api.saveSettings({ defaultSaveFolder: folder, askedSaveFolder: true });
+      showToast('Папка по умолчанию установлена.');
+      return;
+    }
+  }
+  settings = await window.api.saveSettings({ askedSaveFolder: true });
+}
+
 async function saveActiveTab() {
   const tab = getActiveTab();
   if (!tab) return false;
+  if (!tab.filePath) await ensureDefaultSaveFolder();
   captureActiveTabFromDOM();
   const suggestedName = displayName(tab);
   const res = await window.api.saveFile(tab.filePath, tab.bodyHtml, suggestedName);

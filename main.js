@@ -17,6 +17,7 @@ const defaultSettings = {
   spellcheckEn: true,
   defaultSaveFormat: 'docx',
   defaultSaveFolder: '',
+  askedSaveFolder: false,
 };
 
 function loadSettings() {

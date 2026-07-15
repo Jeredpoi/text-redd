@@ -422,7 +422,8 @@ button, input, select { font-family: inherit; }
   display: flex;
 }
 
-.ribbon-panel select {
+.ribbon-panel select,
+.ribbon-panel input[type="number"] {
   height: 32px;
   border: 1px solid var(--input-border);
   border-radius: 10px;
@@ -433,8 +434,12 @@ button, input, select { font-family: inherit; }
   cursor: pointer;
 }
 
+.ribbon-panel input[type="number"] {
+  cursor: text;
+}
+
 #fontName { width: 130px; }
-#fontSize { width: 60px; }
+#fontSize { width: 76px; padding: 0 6px; }
 
 .sep {
   width: 1px;
@@ -726,7 +731,7 @@ button, input, select { font-family: inherit; }
 }
 
 #page {
-  max-width: 720px;
+  max-width: min(880px, 92%);
   margin: 0 auto;
   background: var(--paper-bg);
   border-radius: 10px;

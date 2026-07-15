@@ -356,6 +356,28 @@
     </div>
   </div>
 
+  <div id="closeAppConfirmModal" class="modal-overlay hidden">
+    <div class="modal">
+      <h3>Закрыть без сохранения?</h3>
+      <p id="closeAppConfirmMessage" class="modal-message"></p>
+      <div class="modal-actions">
+        <button id="closeAppCancelBtn" class="btn-secondary">Отмена</button>
+        <button id="closeAppConfirmBtn" class="btn-primary">Закрыть без сохранения</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="saveFolderPromptModal" class="modal-overlay hidden">
+    <div class="modal">
+      <h3>Куда сохранять документы?</h3>
+      <p class="modal-message">Выберите папку по умолчанию — тогда документы будут сохраняться в неё сами, без вопроса «Сохранить как» каждый раз. Это можно позже изменить в Настройках.</p>
+      <div class="modal-actions">
+        <button id="saveFolderSkipBtn" class="btn-secondary">Не сейчас</button>
+        <button id="saveFolderChooseBtn" class="btn-primary">Выбрать папку</button>
+      </div>
+    </div>
+  </div>
+
   <div id="recoveryModal" class="modal-overlay hidden">
     <div class="modal">
       <h3>Восстановить документы?</h3>
