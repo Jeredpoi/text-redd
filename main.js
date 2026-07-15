@@ -7,7 +7,7 @@ const fs = require('fs');
 const settingsPath = () => path.join(app.getPath('userData'), 'settings.json');
 
 const defaultSettings = {
-  theme: 'light',
+  theme: 'dark',
   defaultFontName: 'Calibri',
   defaultFontSize: '3',
   autosaveEnabled: true,
