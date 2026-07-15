@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <title>Простой Редактор</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
-<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Caveat:wght@400;600&family=Comfortaa:wght@400;600&family=Comic+Neue:wght@400;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=Lexend:wght@400;600&family=Lobster&family=Merriweather:ital,wght@0,400;0,700;1,400&family=Montserrat:wght@400;600;700&family=Nunito:wght@400;600;700&family=Oswald:wght@400;600&family=Pacifico&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&family=Roboto+Serif:wght@400;600&family=Spectral:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -51,19 +51,63 @@
       </div>
 
       <div class="ribbon-tabs" role="tablist">
-        <button class="ribbon-tab active" data-target="ribbon-home" role="tab">Главная</button>
-        <button class="ribbon-tab" data-target="ribbon-insert" role="tab">Вставка</button>
         <button class="ribbon-tab" data-target="ribbon-file" role="tab">Файл</button>
+        <button class="ribbon-tab" data-target="ribbon-edit" role="tab">Правка</button>
+        <button class="ribbon-tab" data-target="ribbon-insert" role="tab">Вставка</button>
+        <button class="ribbon-tab active" data-target="ribbon-format" role="tab">Формат</button>
+        <button class="ribbon-tab" data-target="ribbon-tools" role="tab">Инструменты</button>
       </div>
 
-      <div id="ribbon-home" class="ribbon-panel active">
+      <div id="ribbon-edit" class="ribbon-panel">
+        <button class="pill-btn icon-only" id="btnUndo" title="Отменить (Ctrl+Z)">
+          <svg viewBox="0 0 20 20"><path d="M7 8 3 12l4 4"/><path d="M3 12h9a5 5 0 0 0 0-10h-1.5"/></svg>
+        </button>
+        <button class="pill-btn icon-only" id="btnRedo" title="Повторить (Ctrl+Y)">
+          <svg viewBox="0 0 20 20"><path d="M13 8 17 12l-4 4"/><path d="M17 12H8a5 5 0 0 1 0-10h1.5"/></svg>
+        </button>
+        <span class="sep"></span>
+        <button class="pill-btn icon-only" id="btnCut" title="Вырезать (Ctrl+X)">
+          <svg viewBox="0 0 20 20"><circle cx="6" cy="6" r="2.2"/><circle cx="6" cy="14" r="2.2"/><line x1="16" y1="4" x2="7" y2="12.5"/><line x1="12" y1="12" x2="16" y2="16"/><line x1="7" y1="7.5" x2="9.5" y2="10"/></svg>
+        </button>
+        <button class="pill-btn icon-only" id="btnCopy" title="Копировать (Ctrl+C)">
+          <svg viewBox="0 0 20 20"><rect x="7" y="7" width="10" height="10" rx="1.5"/><path d="M4 12.5H3.5A1.5 1.5 0 0 1 2 11V3.5A1.5 1.5 0 0 1 3.5 2H11a1.5 1.5 0 0 1 1.5 1.5V4"/></svg>
+        </button>
+        <button class="pill-btn icon-only" id="btnPasteEdit" title="Вставить (Ctrl+V)">
+          <svg viewBox="0 0 20 20"><path d="M13 3.5h1.5A1.5 1.5 0 0 1 16 5v11.5A1.5 1.5 0 0 1 14.5 18h-9A1.5 1.5 0 0 1 4 16.5V5a1.5 1.5 0 0 1 1.5-1.5H7"/><rect x="7" y="2" width="6" height="3" rx="0.8"/></svg>
+        </button>
+        <span class="sep"></span>
+        <button class="pill-btn icon-only" id="btnClearFormatEdit" title="Очистить форматирование (Ctrl+\)">
+          <svg viewBox="0 0 20 20"><text x="2" y="15" font-size="13" fill="currentColor" stroke="none">A</text><line x1="3" y1="17" x2="16" y2="4"/></svg>
+        </button>
+        <span class="flex-spacer"></span>
+        <button id="findToggleBtnEdit" class="pill-btn find-pill" title="Поиск и замена (Ctrl+F)">⌕ Найти</button>
+      </div>
+
+      <div id="ribbon-format" class="ribbon-panel active">
         <select id="fontName" title="Шрифт">
-          <option value="Calibri">Calibri</option>
-          <option value="Georgia">Georgia</option>
           <option value="Arial">Arial</option>
-          <option value="Times New Roman">Times New Roman</option>
+          <option value="Caveat">Caveat</option>
+          <option value="Comfortaa">Comfortaa</option>
+          <option value="Comic Sans MS">Comic Sans MS</option>
           <option value="Courier New">Courier New</option>
-          <option value="Verdana">Verdana</option>
+          <option value="EB Garamond">EB Garamond</option>
+          <option value="Georgia">Georgia</option>
+          <option value="Impact">Impact</option>
+          <option value="Lexend">Lexend</option>
+          <option value="Lobster">Lobster</option>
+          <option value="Lora">Lora</option>
+          <option value="Merriweather">Merriweather</option>
+          <option value="Montserrat">Montserrat</option>
+          <option value="Nunito">Nunito</option>
+          <option value="Oswald">Oswald</option>
+          <option value="Pacifico">Pacifico</option>
+          <option value="Playfair Display">Playfair Display</option>
+          <option value="Roboto">Roboto</option>
+          <option value="Roboto Mono">Roboto Mono</option>
+          <option value="Roboto Serif">Roboto Serif</option>
+          <option value="Spectral">Spectral</option>
+          <option value="Times New Roman">Times New Roman</option>
+          <option value="Trebuchet MS">Trebuchet MS</option>
         </select>
         <select id="fontSize" title="Размер шрифта">
           <option value="1">8</option>
@@ -89,15 +133,31 @@
         <button class="pill-btn" data-cmd="underline" title="Подчёркнутый (Ctrl+U)"><u>Ч</u></button>
         <button class="pill-btn" data-cmd="strikeThrough" title="Зачёркнутый"><s>Ы</s></button>
         <span class="sep"></span>
-        <label class="color-btn" title="Цвет текста">
-          <span>А</span><span class="color-bar" id="foreColorBar"></span>
-          <input type="color" id="foreColor" value="#1a1a1a" />
-        </label>
-        <label class="color-btn" title="Цвет выделения">
-          <svg viewBox="0 0 20 20" width="14" height="14"><rect x="3" y="8" width="14" height="6" rx="2" fill="currentColor"/></svg>
-          <span class="color-bar" id="hiliteColorBar"></span>
-          <input type="color" id="hiliteColor" value="#fef08a" />
-        </label>
+        <div class="color-trigger-wrap" data-color-wrap>
+          <button class="color-btn" id="foreColorTrigger" title="Цвет текста">
+            <span>А</span><span class="color-bar" id="foreColorBar"></span>
+          </button>
+          <div class="color-dropdown hidden" id="foreColorDropdown">
+            <div class="color-grid" id="foreColorGrid"></div>
+            <div class="color-custom-row">
+              <input type="color" id="foreColorCustomInput" value="#1a1a1a" />
+              <span>Другой</span>
+            </div>
+          </div>
+        </div>
+        <div class="color-trigger-wrap" data-color-wrap>
+          <button class="color-btn" id="hiliteColorTrigger" title="Цвет выделения">
+            <svg viewBox="0 0 20 20" width="14" height="14"><rect x="3" y="8" width="14" height="6" rx="2" fill="currentColor"/></svg>
+            <span class="color-bar" id="hiliteColorBar"></span>
+          </button>
+          <div class="color-dropdown hidden" id="hiliteColorDropdown">
+            <div class="color-grid" id="hiliteColorGrid"></div>
+            <div class="color-custom-row">
+              <input type="color" id="hiliteColorCustomInput" value="#fef08a" />
+              <span>Другой</span>
+            </div>
+          </div>
+        </div>
         <span class="sep"></span>
         <button class="pill-btn icon-only" data-cmd="justifyLeft" title="По левому краю">
           <svg viewBox="0 0 20 20"><line x1="3" y1="5" x2="17" y2="5"/><line x1="3" y1="9" x2="12" y2="9"/><line x1="3" y1="13" x2="17" y2="13"/><line x1="3" y1="17" x2="10" y2="17"/></svg>
@@ -189,6 +249,12 @@
         <button class="pill-btn icon-only" id="btnSettings" title="Настройки">
           <svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="3.2"/><line x1="10" y1="2" x2="10" y2="4.5"/><line x1="10" y1="15.5" x2="10" y2="18"/><line x1="2" y1="10" x2="4.5" y2="10"/><line x1="15.5" y1="10" x2="18" y2="10"/><line x1="4.5" y1="4.5" x2="6.2" y2="6.2"/><line x1="13.8" y1="13.8" x2="15.5" y2="15.5"/><line x1="4.5" y1="15.5" x2="6.2" y2="13.8"/><line x1="13.8" y1="6.2" x2="15.5" y2="4.5"/></svg>
         </button>
+      </div>
+
+      <div id="ribbon-tools" class="ribbon-panel tools-panel">
+        <span>Слов: <b id="toolsWordCount">0</b></span>
+        <span>Символов: <b id="toolsCharCount">0</b></span>
+        <span>≈ <span id="toolsReadingMinutes">1</span> мин чтения</span>
       </div>
 
       <div id="findBar" class="hidden">

@@ -301,11 +301,18 @@ function runAutosave() {
 
 // ---- Статистика ----
 
+const toolsWordCountEl = document.getElementById('toolsWordCount');
+const toolsCharCountEl = document.getElementById('toolsCharCount');
+const toolsReadingMinutesEl = document.getElementById('toolsReadingMinutes');
+
 function updateStats() {
   const text = editor.innerText || '';
   const words = text.trim().length ? text.trim().split(/\s+/).length : 0;
   const chars = text.length;
   statsEl.textContent = `Слов: ${words} · Символов: ${chars}`;
+  toolsWordCountEl.textContent = words;
+  toolsCharCountEl.textContent = chars;
+  toolsReadingMinutesEl.textContent = Math.max(1, Math.round(words / 200));
 }
 
 editor.addEventListener('input', () => {
@@ -431,24 +438,124 @@ document.getElementById('blockFormat').addEventListener('change', (e) => {
   document.execCommand('formatBlock', false, e.target.value);
 });
 
-let lastHiliteColor = document.getElementById('hiliteColor').value;
+// ---- Палитра цветов (текст / выделение) ----
 
-document.getElementById('foreColor').addEventListener('input', (e) => {
+const PALETTE = [
+  ['#000000', '#434343', '#666666', '#999999', '#b7b7b7', '#cccccc', '#d9d9d9', '#efefef', '#f3f3f3', '#ffffff'],
+  ['#980000', '#ff0000', '#ff9900', '#ffff00', '#00ff00', '#00ffff', '#4a86e8', '#0000ff', '#9900ff', '#ff00ff'],
+  ['#e6b8af', '#f4cccc', '#fce5cd', '#fff2cc', '#d9ead3', '#d0e0e3', '#c9daf8', '#cfe2f3', '#d9d2e9', '#ead1dc'],
+  ['#dd7e6b', '#ea9999', '#f9cb9c', '#ffe599', '#b6d7a8', '#a2c4c9', '#a4c2f4', '#9fc5e8', '#b4a7d6', '#d5a6bd'],
+  ['#cc4125', '#e06666', '#f6b26b', '#ffd966', '#93c47d', '#76a5af', '#6d9eeb', '#6fa8dc', '#8e7cc3', '#c27ba0'],
+  ['#a61c00', '#cc0000', '#e69138', '#f1c232', '#6aa84f', '#45818e', '#3c78d8', '#3d85c6', '#674ea7', '#a64d79'],
+];
+
+let lastHiliteColor = document.getElementById('hiliteColorCustomInput').value;
+
+function buildColorGrid(container, onPick) {
+  PALETTE.forEach((row) => {
+    row.forEach((c) => {
+      const sw = document.createElement('div');
+      sw.className = 'color-swatch';
+      sw.style.background = c;
+      sw.title = c;
+      sw.addEventListener('click', () => onPick(c));
+      container.appendChild(sw);
+    });
+  });
+}
+
+const foreColorDropdown = document.getElementById('foreColorDropdown');
+const hiliteColorDropdown = document.getElementById('hiliteColorDropdown');
+
+function closeColorDropdowns() {
+  foreColorDropdown.classList.add('hidden');
+  hiliteColorDropdown.classList.add('hidden');
+}
+
+function applyForeColor(c) {
   editor.focus();
-  document.execCommand('foreColor', false, e.target.value);
-  document.getElementById('foreColorBar').style.background = e.target.value;
+  document.execCommand('foreColor', false, c);
+  document.getElementById('foreColorBar').style.background = c;
+  closeColorDropdowns();
+  markActiveDirty();
+}
+
+function applyHiliteColor(c) {
+  editor.focus();
+  lastHiliteColor = c;
+  document.execCommand('hiliteColor', false, c);
+  document.getElementById('hiliteColorBar').style.background = c;
+  closeColorDropdowns();
+  markActiveDirty();
+}
+
+buildColorGrid(document.getElementById('foreColorGrid'), applyForeColor);
+buildColorGrid(document.getElementById('hiliteColorGrid'), applyHiliteColor);
+
+document.getElementById('foreColorTrigger').addEventListener('click', (e) => {
+  e.stopPropagation();
+  const willOpen = foreColorDropdown.classList.contains('hidden');
+  closeColorDropdowns();
+  if (willOpen) foreColorDropdown.classList.remove('hidden');
 });
 
-document.getElementById('hiliteColor').addEventListener('input', (e) => {
-  editor.focus();
-  lastHiliteColor = e.target.value;
-  document.execCommand('hiliteColor', false, e.target.value);
-  document.getElementById('hiliteColorBar').style.background = e.target.value;
+document.getElementById('hiliteColorTrigger').addEventListener('click', (e) => {
+  e.stopPropagation();
+  const willOpen = hiliteColorDropdown.classList.contains('hidden');
+  closeColorDropdowns();
+  if (willOpen) hiliteColorDropdown.classList.remove('hidden');
 });
+
+document.addEventListener('mousedown', (e) => {
+  if (!e.target.closest('[data-color-wrap]')) closeColorDropdowns();
+});
+
+document.getElementById('foreColorCustomInput').addEventListener('input', (e) => applyForeColor(e.target.value));
+document.getElementById('hiliteColorCustomInput').addEventListener('input', (e) => applyHiliteColor(e.target.value));
 
 document.getElementById('bubbleHiliteBtn').addEventListener('click', () => {
   editor.focus();
   document.execCommand('hiliteColor', false, lastHiliteColor);
+  markActiveDirty();
+});
+
+// ---- Вкладка «Правка»: отменить/повторить/вырезать/копировать/вставить ----
+
+document.getElementById('btnUndo').addEventListener('click', () => {
+  editor.focus();
+  document.execCommand('undo');
+});
+
+document.getElementById('btnRedo').addEventListener('click', () => {
+  editor.focus();
+  document.execCommand('redo');
+});
+
+document.getElementById('btnCut').addEventListener('click', () => {
+  editor.focus();
+  document.execCommand('cut');
+  markActiveDirty();
+});
+
+document.getElementById('btnCopy').addEventListener('click', () => {
+  editor.focus();
+  document.execCommand('copy');
+});
+
+document.getElementById('btnPasteEdit').addEventListener('click', async () => {
+  editor.focus();
+  try {
+    const text = await navigator.clipboard.readText();
+    if (text) document.execCommand('insertText', false, text);
+  } catch (e) {
+    try { document.execCommand('paste'); } catch (e2) {}
+  }
+  markActiveDirty();
+});
+
+document.getElementById('btnClearFormatEdit').addEventListener('click', () => {
+  editor.focus();
+  document.execCommand('removeFormat');
   markActiveDirty();
 });
 
@@ -672,6 +779,8 @@ document.getElementById('btnLink').addEventListener('click', () => {
   linkUrlInput.select();
 });
 
+window.api.onTriggerInsertLink(() => document.getElementById('btnLink').click());
+
 linkCancelBtn.addEventListener('click', () => closeModal(linkModal));
 
 linkOkBtn.addEventListener('click', () => {
@@ -796,11 +905,13 @@ const matchLabelEl = document.getElementById('matchLabel');
 const findToggleBtn = document.getElementById('findToggleBtn');
 const findToggleBtn2 = document.getElementById('findToggleBtn2');
 const findToggleBtn3 = document.getElementById('findToggleBtn3');
+const findToggleBtnEdit = document.getElementById('findToggleBtnEdit');
 
 function setFindActive(active) {
   findToggleBtn.classList.toggle('active', active);
   findToggleBtn2.classList.toggle('active', active);
   findToggleBtn3.classList.toggle('active', active);
+  findToggleBtnEdit.classList.toggle('active', active);
 }
 
 function openFindBar() {
@@ -833,6 +944,7 @@ function updateMatchLabel() {
 findToggleBtn.addEventListener('click', toggleFindBar);
 findToggleBtn2.addEventListener('click', toggleFindBar);
 findToggleBtn3.addEventListener('click', toggleFindBar);
+findToggleBtnEdit.addEventListener('click', toggleFindBar);
 document.getElementById('closeFindBtn').addEventListener('click', closeFindBar);
 findInput.addEventListener('input', updateMatchLabel);
 
@@ -878,6 +990,8 @@ document.addEventListener('keydown', (e) => {
   if (mod && key === 'p') { e.preventDefault(); window.api.print(); return; }
   if (mod && key === 'w') { e.preventDefault(); closeTab(activeTabId); return; }
   if (mod && key === 'f') { e.preventDefault(); openFindBar(); return; }
+  if (mod && key === 'k') { e.preventDefault(); document.getElementById('btnLink').click(); return; }
+  if (mod && e.key === '\\') { e.preventDefault(); editor.focus(); document.execCommand('removeFormat'); markActiveDirty(); return; }
   if (mod && e.shiftKey && key === 'i') { e.preventDefault(); window.api.toggleDevTools(); return; }
   if (e.key === 'F12') { e.preventDefault(); window.api.toggleDevTools(); return; }
   if (e.key === 'F11') { e.preventDefault(); window.api.toggleFullscreen(); return; }

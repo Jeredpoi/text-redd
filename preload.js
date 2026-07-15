@@ -30,4 +30,5 @@ contextBridge.exposeInMainWorld('api', {
   onApplyTheme: (cb) => ipcRenderer.on('apply-theme', (e, theme) => cb(theme)),
   onRecentFilesChanged: (cb) => ipcRenderer.on('recent-files-changed', cb),
   onCloseRequested: (cb) => ipcRenderer.on('app-close-requested', cb),
+  onTriggerInsertLink: (cb) => ipcRenderer.on('trigger-insert-link', cb),
 });

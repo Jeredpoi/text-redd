@@ -144,8 +144,18 @@ function createWindow() {
     menuItems.push(
       { label: 'Вырезать', role: 'cut', enabled: params.editFlags.canCut },
       { label: 'Копировать', role: 'copy', enabled: params.editFlags.canCopy },
-      { label: 'Вставить', role: 'paste', enabled: params.editFlags.canPaste }
+      { label: 'Вставить', role: 'paste', enabled: params.editFlags.canPaste },
+      { label: 'Вставить без форматирования', role: 'pasteAndMatchStyle', enabled: params.editFlags.canPaste }
     );
+
+    if (params.isEditable) {
+      menuItems.push({ type: 'separator' });
+      menuItems.push({
+        label: 'Вставить ссылку',
+        accelerator: 'CmdOrCtrl+K',
+        click: () => win.webContents.send('trigger-insert-link'),
+      });
+    }
 
     Menu.buildFromTemplate(menuItems).popup();
   });
