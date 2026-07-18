@@ -846,6 +846,19 @@ button, input, select { font-family: inherit; }
   margin: 0 4px;
 }
 
+.bubble-toolbar select {
+  height: 28px;
+  max-width: 120px;
+  border: none;
+  border-radius: 8px;
+  background: oklch(30% .008 90);
+  color: #fff;
+  font-size: 12.5px;
+  padding: 0 6px;
+  cursor: pointer;
+  outline: none;
+}
+
 /* ---- Status bar ---- */
 
 #statusBar {

@@ -37,13 +37,19 @@ function updateDisplayName(tab) {
   fileNameEl.textContent = displayName(tab);
 }
 
+// Символы нулевой ширины (U+200B) — служебные якоря для «шрифта нового
+// текста» (см. insertTypingStyleSpan); в сохранённый файл попадать не должны.
+function stripZeroWidth(html) {
+  return (html || '').replace(/\u200B/g, '');
+}
+
 function combinedContent() {
-  return editor.innerHTML;
+  return stripZeroWidth(editor.innerHTML);
 }
 
 function combinedContentOf(tab) {
   if (tab.id === activeTabId) captureActiveTabFromDOM();
-  return tab.bodyHtml || '';
+  return stripZeroWidth(tab.bodyHtml || '');
 }
 
 // ---- Вкладки ----
@@ -111,6 +117,7 @@ function applyDefaultFont() {
   editor.style.fontFamily = settings.defaultFontName;
   editor.style.fontSize = `${settings.defaultFontSize || 15}px`;
   document.getElementById('fontName').value = settings.defaultFontName;
+  document.getElementById('bubbleFontName').value = settings.defaultFontName;
   document.getElementById('fontSize').value = settings.defaultFontSize || 15;
 }
 
@@ -496,7 +503,7 @@ async function runAutosave() {
   if (dirtyTabs.length === 0) return;
   let changed = false;
   for (const t of dirtyTabs) {
-    const html = t.id === activeTabId ? editor.innerHTML : t.bodyHtml;
+    const html = stripZeroWidth(t.id === activeTabId ? editor.innerHTML : t.bodyHtml);
     if (settings.defaultSaveFolder) {
       const res = await window.api.saveFile(t.filePath, html, displayName(t));
       if (res) {
@@ -705,35 +712,70 @@ function applyInlineStyleToRange(range, applyStyle) {
   return applied;
 }
 
-const fontNameSelectEl = document.getElementById('fontName');
-fontNameSelectEl.addEventListener('mousedown', saveSelection);
-fontNameSelectEl.addEventListener('change', (e) => {
-  const applied = applyInlineStyleToRange(savedRange, (span) => {
-    span.style.fontFamily = e.target.value;
-  });
+// Когда выделения нет (просто мигает курсор), выделять нечего — вместо этого
+// вставляем в позицию курсора пустой стилизованный span с символом нулевой
+// ширины и ставим курсор внутрь: всё, что пользователь напечатает дальше,
+// унаследует выбранный стиль (как «шрифт для нового текста» в Word).
+function insertTypingStyleSpan(applyStyle) {
   editor.focus();
-  if (!applied) document.execCommand('fontName', false, e.target.value);
-  markActiveDirty();
-  scheduleAutosave();
-});
+  const sel = window.getSelection();
+  let range = null;
+  if (savedRange) {
+    range = savedRange.cloneRange();
+  } else if (sel.rangeCount > 0 && editor.contains(sel.anchorNode)) {
+    range = sel.getRangeAt(0).cloneRange();
+  } else {
+    range = document.createRange();
+    range.selectNodeContents(editor);
+  }
+  range.collapse(false);
+  const span = document.createElement('span');
+  applyStyle(span);
+  span.textContent = '\u200B';
+  range.insertNode(span);
+  const caret = document.createRange();
+  caret.setStart(span.firstChild, 1);
+  caret.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(caret);
+}
 
-function setFontSizePx(px) {
-  const applied = applyInlineStyleToRange(savedRange, (span) => {
-    span.style.fontSize = `${px}px`;
-  });
-  editor.focus();
+function applyTextStyle(applyStyle) {
+  const applied = applyInlineStyleToRange(savedRange, applyStyle);
   if (!applied) {
-    document.execCommand('fontSize', false, '7');
-    Array.from(editor.querySelectorAll('font[size="7"]')).forEach((el) => {
-      const span = document.createElement('span');
-      span.style.fontSize = `${px}px`;
-      while (el.firstChild) span.appendChild(el.firstChild);
-      el.replaceWith(span);
-    });
+    insertTypingStyleSpan(applyStyle);
+  } else {
+    editor.focus();
   }
   markActiveDirty();
-  updateStats();
   scheduleAutosave();
+}
+
+const fontNameSelectEl = document.getElementById('fontName');
+const bubbleFontNameEl = document.getElementById('bubbleFontName');
+// Список шрифтов во всплывающей панели — копия основного из ленты.
+Array.from(fontNameSelectEl.options).forEach((o) => {
+  bubbleFontNameEl.appendChild(new Option(o.text, o.value));
+});
+
+function onFontNameChange(e) {
+  const value = e.target.value;
+  fontNameSelectEl.value = value;
+  bubbleFontNameEl.value = value;
+  applyTextStyle((span) => { span.style.fontFamily = value; });
+}
+
+// mousedown — для мыши; focus — для клавиатурной навигации (Tab + стрелки).
+fontNameSelectEl.addEventListener('mousedown', saveSelection);
+fontNameSelectEl.addEventListener('focus', saveSelection);
+fontNameSelectEl.addEventListener('change', onFontNameChange);
+bubbleFontNameEl.addEventListener('mousedown', saveSelection);
+bubbleFontNameEl.addEventListener('focus', saveSelection);
+bubbleFontNameEl.addEventListener('change', onFontNameChange);
+
+function setFontSizePx(px) {
+  applyTextStyle((span) => { span.style.fontSize = `${px}px`; });
+  updateStats();
 }
 
 const fontSizeInputEl = document.getElementById('fontSize');
@@ -746,6 +788,7 @@ fontSizeInputEl.addEventListener('change', (e) => {
 
 const blockFormatEl = document.getElementById('blockFormat');
 blockFormatEl.addEventListener('mousedown', saveSelection);
+blockFormatEl.addEventListener('focus', saveSelection);
 blockFormatEl.addEventListener('change', (e) => {
   restoreSelection();
   document.execCommand('formatBlock', false, e.target.value);
@@ -954,6 +997,7 @@ function applyFontControlsFromNode(node, useCommandValue) {
   }
   if (clean && [...fontNameSelect.options].some((o) => o.value.toLowerCase() === clean.toLowerCase())) {
     fontNameSelect.value = clean;
+    bubbleFontNameEl.value = clean;
   }
 
   const size = parseInt(computed.fontSize, 10);
@@ -1323,7 +1367,7 @@ async function saveActiveTab() {
   if (!tab.filePath) await ensureDefaultSaveFolder();
   captureActiveTabFromDOM();
   const suggestedName = displayName(tab);
-  const res = await window.api.saveFile(tab.filePath, tab.bodyHtml, suggestedName);
+  const res = await window.api.saveFile(tab.filePath, stripZeroWidth(tab.bodyHtml), suggestedName);
   if (!res) return false;
   tab.filePath = res.path;
   tab.fileName = res.name;
@@ -1344,7 +1388,7 @@ async function saveActiveTabAs() {
   if (!tab) return false;
   captureActiveTabFromDOM();
   const suggestedName = displayName(tab);
-  const res = await window.api.saveAsDialog(tab.bodyHtml, suggestedName);
+  const res = await window.api.saveAsDialog(stripZeroWidth(tab.bodyHtml), suggestedName);
   if (!res) return false;
   tab.filePath = res.path;
   tab.fileName = res.name;

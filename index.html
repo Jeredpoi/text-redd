@@ -96,6 +96,7 @@
       <div id="ribbon-format" class="ribbon-panel active">
         <select id="fontName" title="Шрифт">
           <option value="Arial">Arial</option>
+          <option value="Calibri">Calibri</option>
           <option value="Caveat">Caveat</option>
           <option value="Comfortaa">Comfortaa</option>
           <option value="Comic Sans MS">Comic Sans MS</option>
@@ -118,6 +119,7 @@
           <option value="Spectral">Spectral</option>
           <option value="Times New Roman">Times New Roman</option>
           <option value="Trebuchet MS">Trebuchet MS</option>
+          <option value="Verdana">Verdana</option>
         </select>
         <input type="number" id="fontSize" list="fontSizePresets" min="1" max="400" value="12" title="Размер шрифта" />
         <datalist id="fontSizePresets">
@@ -299,6 +301,8 @@
       </div>
 
       <div id="bubbleToolbar" class="bubble-toolbar hidden">
+        <select id="bubbleFontName" title="Шрифт"></select>
+        <span class="bubble-sep"></span>
         <button data-cmd="bold" title="Жирный"><b>Ж</b></button>
         <button data-cmd="italic" title="Курсив"><i>К</i></button>
         <button data-cmd="underline" title="Подчёркнутый"><u>Ч</u></button>
