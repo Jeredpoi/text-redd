@@ -810,6 +810,106 @@ blockFormatEl.addEventListener('change', (e) => {
   scheduleAutosave();
 });
 
+// ---- Межстрочный интервал (как в Google Docs) ----
+
+const BLOCK_TAGS = new Set(['P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'BLOCKQUOTE', 'PRE']);
+
+function blocksInRange(range) {
+  const blocks = new Set();
+  const addBlockOf = (node) => {
+    let el = node.nodeType === 3 ? node.parentElement : node;
+    while (el && el !== editor) {
+      if (BLOCK_TAGS.has(el.tagName)) {
+        blocks.add(el);
+        return;
+      }
+      el = el.parentElement;
+    }
+    // Текст лежит прямо в редакторе, вне блочных элементов
+    if (el === editor && node.nodeType === 3) blocks.add(editor);
+  };
+  if (!range) return [];
+  const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, {
+    acceptNode: (node) => (range.intersectsNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT),
+  });
+  let n;
+  while ((n = walker.nextNode())) addBlockOf(n);
+  if (blocks.size === 0) addBlockOf(range.startContainer);
+  return [...blocks];
+}
+
+const lineSpacingEl = document.getElementById('lineSpacing');
+lineSpacingEl.addEventListener('mousedown', saveSelection);
+lineSpacingEl.addEventListener('focus', saveSelection);
+lineSpacingEl.addEventListener('change', (e) => {
+  const value = e.target.value;
+  if (!value) return;
+  let range = savedRange;
+  if (!range) {
+    const sel = window.getSelection();
+    if (sel.rangeCount > 0 && editor.contains(sel.anchorNode)) range = sel.getRangeAt(0);
+  }
+  const targets = blocksInRange(range);
+  if (targets.length > 0) {
+    targets.forEach((el) => { el.style.lineHeight = value; });
+  } else {
+    editor.style.lineHeight = value;
+  }
+  editor.focus();
+  e.target.selectedIndex = 0;
+  markActiveDirty();
+  scheduleAutosave();
+});
+
+// ---- Чек-лист (как в Google Docs) ----
+
+document.getElementById('btnChecklist').addEventListener('click', () => {
+  editor.focus();
+  document.execCommand(
+    'insertHTML',
+    false,
+    '<ul class="checklist"><li><input type="checkbox" contenteditable="false"> </li></ul>'
+  );
+  markActiveDirty();
+  scheduleAutosave();
+});
+
+// Клик по чекбоксу отмечает пункт (сам чекбокс не редактируется).
+editor.addEventListener('click', (e) => {
+  if (e.target.matches('ul.checklist input[type="checkbox"]')) {
+    e.target.toggleAttribute('checked', e.target.checked);
+    const li = e.target.closest('li');
+    if (li) li.classList.toggle('done', e.target.checked);
+    markActiveDirty();
+    scheduleAutosave();
+  }
+});
+
+// Enter внутри чек-листа: новый пункт должен сразу получить свой чекбокс.
+editor.addEventListener('keyup', (e) => {
+  if (e.key !== 'Enter') return;
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return;
+  let node = sel.anchorNode;
+  if (node && node.nodeType === 3) node = node.parentElement;
+  const li = node && node.closest ? node.closest('ul.checklist li') : null;
+  if (li && !li.querySelector('input[type="checkbox"]')) {
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.setAttribute('contenteditable', 'false');
+    li.classList.remove('done');
+    li.insertBefore(box, li.firstChild);
+    const space = document.createTextNode(' ');
+    li.insertBefore(space, box.nextSibling);
+    // Курсор — после чекбокса, чтобы текст печатался за ним, а не перед
+    const caret = document.createRange();
+    caret.setStart(space, 1);
+    caret.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(caret);
+  }
+});
+
 // ---- Палитра цветов (текст / выделение) ----
 
 const PALETTE = [

@@ -440,6 +440,7 @@ button, input, select { font-family: inherit; }
 
 #fontName { width: 130px; }
 #fontSize { width: 76px; padding: 0 6px; }
+#lineSpacing { width: 108px; }
 
 .sep {
   width: 1px;
@@ -846,6 +847,33 @@ button, input, select { font-family: inherit; }
   content: attr(data-placeholder);
   color: var(--text-secondary);
   opacity: .7;
+}
+
+#editor ul.checklist {
+  list-style: none;
+  padding-left: 6px;
+}
+
+#editor ul.checklist li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 4px 0;
+}
+
+#editor ul.checklist input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  position: relative;
+  top: 2px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+#editor ul.checklist li.done {
+  text-decoration: line-through;
+  color: var(--text-secondary);
 }
 
 #editor table {
