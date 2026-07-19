@@ -396,6 +396,49 @@ function showRecoveryModal(count) {
   });
 }
 
+// ---- История версий документа ----
+
+const historyModal = document.getElementById('historyModal');
+const historyListEl = document.getElementById('historyList');
+const historyEmptyMsgEl = document.getElementById('historyEmptyMsg');
+
+async function openHistoryModal() {
+  const tab = getActiveTab();
+  historyListEl.innerHTML = '';
+  const versions = tab && tab.filePath ? await window.api.listVersions(tab.filePath) : [];
+  historyEmptyMsgEl.classList.toggle('hidden', versions.length > 0);
+  versions.forEach((ts) => {
+    const item = document.createElement('div');
+    item.className = 'history-item';
+    const when = new Date(ts).toLocaleString('ru-RU', {
+      day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', second: '2-digit',
+    });
+    item.innerHTML = `<span>${when}</span><button class="btn-secondary" type="button">Восстановить</button>`;
+    item.querySelector('button').addEventListener('click', async () => {
+      const html = await window.api.readVersion(tab.filePath, ts);
+      if (html === null) {
+        showToast('Не удалось прочитать эту версию.');
+        return;
+      }
+      editor.innerHTML = html;
+      tab.bodyHtml = html;
+      markActiveDirty();
+      updateStats();
+      computeOutline();
+      historyModal.classList.add('hidden');
+      showToast('Версия восстановлена — не забудьте сохранить (Ctrl+S).');
+    });
+    historyListEl.appendChild(item);
+  });
+  historyModal.classList.remove('hidden');
+}
+
+document.getElementById('btnHistory').addEventListener('click', openHistoryModal);
+document.getElementById('historyCloseBtn').addEventListener('click', () => historyModal.classList.add('hidden'));
+historyModal.addEventListener('mousedown', (e) => {
+  if (e.target === historyModal) historyModal.classList.add('hidden');
+});
+
 // ---- Приветственная презентация (только при самом первом запуске) ----
 
 const ONBOARDING_SLIDES = [
@@ -779,11 +822,11 @@ const TEMPLATES = [
   },
   {
     id: 'note', name: 'Заметка', icon: '📝', title: 'Заметка',
-    html: '<p><i>' + new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }) + '</i></p><p></p><p>Запишите мысли здесь…</p>',
+    html: '<p><i>' + new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }) + '</i></p><p><br></p><p>Запишите мысли здесь…</p>',
   },
   {
     id: 'letter', name: 'Письмо', icon: '✉️', title: 'Письмо',
-    html: '<p>Здравствуйте, ____!</p><p></p><p>Пишу вам, чтобы…</p><p></p><p>С уважением,<br>____</p>',
+    html: '<p>Здравствуйте, ____!</p><p><br></p><p>Пишу вам, чтобы…</p><p><br></p><p>С уважением,<br>____</p>',
   },
   {
     id: 'todo', name: 'Список дел', icon: '✅', title: 'Список дел',
@@ -791,7 +834,7 @@ const TEMPLATES = [
   },
   {
     id: 'report', name: 'Отчёт', icon: '📊', title: 'Отчёт',
-    html: '<h2>Итоги</h2><p>Кратко опишите главное…</p><h2>Подробности</h2><table><tbody><tr><td><b>Показатель</b></td><td><b>Значение</b></td></tr><tr><td></td><td></td></tr><tr><td></td><td></td></tr></tbody></table><h2>Выводы</h2><p></p>',
+    html: '<h2>Итоги</h2><p>Кратко опишите главное…</p><h2>Подробности</h2><table><tbody><tr><td><b>Показатель</b></td><td><b>Значение</b></td></tr><tr><td></td><td></td></tr><tr><td></td><td></td></tr></tbody></table><h2>Выводы</h2><p><br></p>',
   },
 ];
 
@@ -1127,6 +1170,67 @@ editor.addEventListener('click', (e) => {
     scheduleAutosave();
   }
 });
+
+// ---- Изменение размера картинок перетаскиванием ----
+
+const imgResizeOverlay = document.getElementById('imgResizeOverlay');
+const imgResizeHandle = document.getElementById('imgResizeHandle');
+let resizingImg = null;
+
+function positionImgOverlay() {
+  if (!resizingImg || !editor.contains(resizingImg)) {
+    hideImgOverlay();
+    return;
+  }
+  const r = resizingImg.getBoundingClientRect();
+  imgResizeOverlay.style.top = `${r.top}px`;
+  imgResizeOverlay.style.left = `${r.left}px`;
+  imgResizeOverlay.style.width = `${r.width}px`;
+  imgResizeOverlay.style.height = `${r.height}px`;
+  imgResizeOverlay.classList.remove('hidden');
+}
+
+function hideImgOverlay() {
+  imgResizeOverlay.classList.add('hidden');
+  resizingImg = null;
+}
+
+editor.addEventListener('click', (e) => {
+  if (e.target.tagName === 'IMG') {
+    resizingImg = e.target;
+    positionImgOverlay();
+  } else if (!e.target.closest('#imgResizeOverlay')) {
+    hideImgOverlay();
+  }
+});
+
+imgResizeHandle.addEventListener('mousedown', (e) => {
+  if (!resizingImg) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const img = resizingImg;
+  const startX = e.clientX;
+  const startWidth = img.getBoundingClientRect().width;
+
+  function onMove(ev) {
+    const w = Math.max(24, Math.round(startWidth + (ev.clientX - startX)));
+    img.style.width = `${w}px`;
+    img.style.height = 'auto';
+    positionImgOverlay();
+  }
+  function onUp() {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    markActiveDirty();
+    scheduleAutosave();
+  }
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+});
+
+editor.addEventListener('input', hideImgOverlay);
+pageScrollEl.addEventListener('scroll', hideImgOverlay);
+window.addEventListener('resize', hideImgOverlay);
 
 // ---- Редактирование таблиц через правый клик по ячейке ----
 

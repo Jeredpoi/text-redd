@@ -32,6 +32,9 @@ contextBridge.exposeInMainWorld('api', {
   showRecentItemMenu: (filePath) => ipcRenderer.invoke('show-recent-item-menu', filePath),
   showTabContextMenu: (tabId) => ipcRenderer.invoke('show-tab-context-menu', tabId),
 
+  listVersions: (filePath) => ipcRenderer.invoke('list-versions', filePath),
+  readVersion: (filePath, ts) => ipcRenderer.invoke('read-version', filePath, ts),
+
   autosaveTab: (data) => ipcRenderer.invoke('autosave-tab', data),
   clearRecovery: (id) => ipcRenderer.invoke('clear-recovery', id),
   listRecoveries: () => ipcRenderer.invoke('list-recoveries'),

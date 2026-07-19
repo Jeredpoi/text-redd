@@ -114,6 +114,64 @@ function recoveryFilePath(recoveryId) {
   return path.join(recoveryDir(), `${recoveryId}.json`);
 }
 
+// ---- История версий документов ----
+// При каждом сохранении файла складываем снимок содержимого в
+// userData/versions/<хэш пути>/<время>.json, храним до 20 на документ.
+
+const versionsRoot = () => {
+  const dir = path.join(app.getPath('userData'), 'versions');
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+  } catch (e) {}
+  return dir;
+};
+
+function versionsDirFor(filePath) {
+  const crypto = require('crypto');
+  const hash = crypto.createHash('sha1').update(filePath).digest('hex').slice(0, 16);
+  return path.join(versionsRoot(), hash);
+}
+
+function storeVersion(filePath, html) {
+  try {
+    const dir = versionsDirFor(filePath);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, `${Date.now()}.json`), JSON.stringify({ filePath, html }));
+    const entries = fs
+      .readdirSync(dir)
+      .filter((f) => f.endsWith('.json'))
+      .sort();
+    while (entries.length > 20) {
+      fs.unlinkSync(path.join(dir, entries.shift()));
+    }
+  } catch (e) {}
+}
+
+function listVersions(filePath) {
+  try {
+    return fs
+      .readdirSync(versionsDirFor(filePath))
+      .filter((f) => f.endsWith('.json'))
+      .map((f) => parseInt(f, 10))
+      .filter((n) => Number.isFinite(n))
+      .sort((a, b) => b - a);
+  } catch (e) {
+    return [];
+  }
+}
+
+function readVersion(filePath, ts) {
+  try {
+    const data = JSON.parse(fs.readFileSync(path.join(versionsDirFor(filePath), `${ts}.json`), 'utf-8'));
+    return data.html || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+ipcMain.handle('list-versions', (event, filePath) => listVersions(filePath));
+ipcMain.handle('read-version', (event, filePath, ts) => readVersion(filePath, ts));
+
 // ---- Вспомогательное для файловых имён ----
 
 function sanitizeFileName(name) {
@@ -590,6 +648,7 @@ async function saveAsFlow(win, html, suggestedName) {
   const result = await dialog.showSaveDialog(win, { filters, defaultPath });
   if (result.canceled || !result.filePath) return null;
   await writeFile(result.filePath, html);
+  storeVersion(result.filePath, html);
   addRecentFile(result.filePath);
   return { path: result.filePath, name: path.basename(result.filePath) };
 }
@@ -612,6 +671,7 @@ ipcMain.handle('save-file', async (event, filePath, html, suggestedName) => {
         fs.mkdirSync(settings.defaultSaveFolder, { recursive: true });
         const target = uniquePath(settings.defaultSaveFolder, base, `.${fmt}`);
         await writeFile(target, html);
+        storeVersion(target, html);
         addRecentFile(target);
         return { path: target, name: path.basename(target) };
       } catch (e) {
@@ -642,6 +702,7 @@ ipcMain.handle('save-file', async (event, filePath, html, suggestedName) => {
   }
 
   await writeFile(targetPath, html);
+  storeVersion(targetPath, html);
   if (targetPath !== filePath) addRecentFile(targetPath);
   return { path: targetPath, name: path.basename(targetPath) };
 });

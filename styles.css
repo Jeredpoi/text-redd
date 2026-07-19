@@ -1358,6 +1358,59 @@ body.focus-mode #statusBar {
   text-decoration: underline;
 }
 
+/* ---- История версий ---- */
+
+.history-modal { width: 340px; }
+
+.history-list {
+  max-height: 300px;
+  overflow-y: auto;
+  margin-bottom: 12px;
+}
+
+.history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  padding: 7px 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.history-item:last-child { border-bottom: none; }
+
+.history-item .btn-secondary {
+  padding: 4px 10px;
+  font-size: 12px;
+  flex: none;
+}
+
+/* ---- Рамка изменения размера картинки ---- */
+
+#imgResizeOverlay {
+  position: fixed;
+  border: 2px solid var(--accent);
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 44;
+}
+
+#imgResizeOverlay.hidden { display: none; }
+
+#imgResizeHandle {
+  position: absolute;
+  right: -7px;
+  bottom: -7px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid #fff;
+  cursor: nwse-resize;
+  pointer-events: auto;
+}
+
 /* ---- Приветственная презентация ---- */
 
 .onboarding-card {
