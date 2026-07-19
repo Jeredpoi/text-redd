@@ -18,6 +18,9 @@ const defaultSettings = {
   defaultSaveFormat: 'docx',
   defaultSaveFolder: '',
   askedSaveFolder: false,
+  pageWidth: 'normal',
+  defaultLineSpacing: '',
+  showStartScreen: true,
   // Приветственная презентация показывается один раз при самом первом
   // запуске; settings.json живёт в userData и переживает обновления,
   // поэтому после апдейтов она не появится снова.

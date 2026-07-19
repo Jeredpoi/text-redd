@@ -853,6 +853,7 @@ function renderStartRecents() {
 }
 
 function tabIsPristine(tab) {
+  if (settings && settings.showStartScreen === false) return false;
   if (!tab || tab.filePath || tab.isDirty || tab.startDismissed) return false;
   if ((docTitle.textContent || '').trim() !== '') return false;
   if ((editor.textContent || '').trim() !== '') return false;
@@ -1635,10 +1636,25 @@ settingsChooseFolderBtn.addEventListener('click', async () => {
   }
 });
 
+// Список шрифтов в настройках — тот же, что на ленте.
+Array.from(document.getElementById('fontName').options).forEach((o) => {
+  settingsFontNameEl.appendChild(new Option(o.text, o.value));
+});
+
+// Ширина страницы и межстрочный интервал применяются сразу при запуске
+// и после сохранения настроек.
+function applyAppearanceSettings() {
+  document.body.dataset.pageWidth = settings.pageWidth || 'normal';
+  editor.style.lineHeight = settings.defaultLineSpacing || '';
+}
+
 function openSettingsModal() {
   settingsThemeEl.value = settings.theme;
   settingsFontNameEl.value = settings.defaultFontName;
   settingsFontSizeEl.value = settings.defaultFontSize;
+  document.getElementById('settingsPageWidth').value = settings.pageWidth || 'normal';
+  document.getElementById('settingsLineSpacing').value = settings.defaultLineSpacing || '';
+  document.getElementById('settingsShowStartScreen').checked = settings.showStartScreen !== false;
   settingsAutosaveEnabledEl.checked = settings.autosaveEnabled;
   settingsAutosaveIntervalEl.value = settings.autosaveIntervalSec;
   settingsSpellRuEl.checked = settings.spellcheckRu;
@@ -1654,6 +1670,7 @@ function closeSettingsModal() {
 }
 
 document.getElementById('btnSettings').addEventListener('click', openSettingsModal);
+document.getElementById('tabSettingsBtn').addEventListener('click', openSettingsModal);
 document.getElementById('settingsCancelBtn').addEventListener('click', closeSettingsModal);
 settingsModal.addEventListener('mousedown', (e) => {
   if (e.target === settingsModal) closeSettingsModal();
@@ -1664,6 +1681,9 @@ document.getElementById('settingsSaveBtn').addEventListener('click', async () =>
     theme: settingsThemeEl.value,
     defaultFontName: settingsFontNameEl.value,
     defaultFontSize: Math.max(1, Math.min(400, parseInt(settingsFontSizeEl.value, 10) || 12)),
+    pageWidth: document.getElementById('settingsPageWidth').value,
+    defaultLineSpacing: document.getElementById('settingsLineSpacing').value,
+    showStartScreen: document.getElementById('settingsShowStartScreen').checked,
     autosaveEnabled: settingsAutosaveEnabledEl.checked,
     autosaveIntervalSec: Math.max(5, Math.min(600, parseInt(settingsAutosaveIntervalEl.value, 10) || 20)),
     spellcheckRu: settingsSpellRuEl.checked,
@@ -1673,6 +1693,8 @@ document.getElementById('settingsSaveBtn').addEventListener('click', async () =>
   };
   settings = await window.api.saveSettings(next);
   applyTheme(settings.theme === 'dark');
+  applyAppearanceSettings();
+  updateStartScreenVisibility();
   restartAutosaveTimer();
   closeSettingsModal();
   showToast('Настройки сохранены.');
@@ -2091,6 +2113,7 @@ document.addEventListener('keydown', (e) => {
 async function init() {
   settings = await window.api.getSettings();
   applyTheme(settings.theme === 'dark');
+  applyAppearanceSettings();
   initAppVersion();
   if (!settings.onboardingShown) showOnboarding();
 

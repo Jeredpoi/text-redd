@@ -58,6 +58,9 @@
       <div id="tabBar">
         <div id="tabList"></div>
         <button id="newTabBtn" class="rail-btn" title="Новая вкладка (Ctrl+N)">+</button>
+        <button id="tabSettingsBtn" class="rail-btn" title="Настройки">
+          <svg viewBox="0 0 20 20" width="15" height="15" style="stroke:currentColor;stroke-width:1.6;fill:none;stroke-linecap:round"><circle cx="10" cy="10" r="3.2"/><line x1="10" y1="2" x2="10" y2="4.5"/><line x1="10" y1="15.5" x2="10" y2="18"/><line x1="2" y1="10" x2="4.5" y2="10"/><line x1="15.5" y1="10" x2="18" y2="10"/><line x1="4.5" y1="4.5" x2="6.2" y2="6.2"/><line x1="13.8" y1="13.8" x2="15.5" y2="15.5"/><line x1="4.5" y1="15.5" x2="6.2" y2="13.8"/><line x1="13.8" y1="6.2" x2="15.5" y2="4.5"/></svg>
+        </button>
       </div>
 
       <div class="ribbon-tabs" role="tablist">
@@ -507,17 +510,34 @@
           </select>
         </label>
         <label class="settings-row">Шрифт по умолчанию
-          <select id="settingsFontName">
-            <option value="Calibri">Calibri</option>
-            <option value="Georgia">Georgia</option>
-            <option value="Arial">Arial</option>
-            <option value="Times New Roman">Times New Roman</option>
-            <option value="Courier New">Courier New</option>
-            <option value="Verdana">Verdana</option>
-          </select>
+          <select id="settingsFontName"></select>
         </label>
         <label class="settings-row">Размер по умолчанию
           <input type="number" id="settingsFontSize" list="fontSizePresets" min="1" max="400" />
+        </label>
+        <label class="settings-row">Ширина страницы
+          <select id="settingsPageWidth">
+            <option value="narrow">Узкая</option>
+            <option value="normal">Обычная</option>
+            <option value="wide">Широкая</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">Редактор</div>
+        <label class="settings-row">Межстрочный интервал
+          <select id="settingsLineSpacing">
+            <option value="">Стандартный</option>
+            <option value="1">Одинарный</option>
+            <option value="1.15">1,15</option>
+            <option value="1.5">1,5</option>
+            <option value="2">Двойной</option>
+          </select>
+        </label>
+        <label class="settings-row checkbox-row">
+          <input type="checkbox" id="settingsShowStartScreen" />
+          Стартовый экран на новой вкладке
         </label>
       </div>
 
