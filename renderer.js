@@ -885,6 +885,64 @@ editor.addEventListener('click', (e) => {
   }
 });
 
+// ---- Редактирование таблиц через правый клик по ячейке ----
+
+let ctxTableCell = null;
+
+editor.addEventListener('contextmenu', (e) => {
+  const cell = e.target.closest && e.target.closest('td, th');
+  ctxTableCell = cell && editor.contains(cell) ? cell : null;
+  // Флаг для главного процесса: он строит нативное меню и добавляет
+  // пункты работы с таблицей, только если клик был в ячейке.
+  window.__literaTableCtx = !!ctxTableCell;
+});
+
+function emptyCellLike(refCell) {
+  const td = document.createElement(refCell ? refCell.tagName.toLowerCase() : 'td');
+  td.innerHTML = '<br>';
+  return td;
+}
+
+function tableOp(op) {
+  const cell = ctxTableCell;
+  if (!cell || !editor.contains(cell)) return;
+  const row = cell.parentElement;
+  const table = cell.closest('table');
+  if (!row || !table) return;
+  const colIdx = [...row.children].indexOf(cell);
+
+  if (op === 'row-above' || op === 'row-below') {
+    const newRow = document.createElement('tr');
+    for (let i = 0; i < row.children.length; i++) newRow.appendChild(emptyCellLike(row.children[i]));
+    row.parentElement.insertBefore(newRow, op === 'row-above' ? row : row.nextSibling);
+  } else if (op === 'col-left' || op === 'col-right') {
+    table.querySelectorAll('tr').forEach((tr) => {
+      const ref = tr.children[colIdx];
+      const td = emptyCellLike(ref);
+      if (ref) tr.insertBefore(td, op === 'col-left' ? ref : ref.nextSibling);
+      else tr.appendChild(td);
+    });
+  } else if (op === 'del-row') {
+    row.remove();
+    if (!table.querySelector('tr')) table.remove();
+  } else if (op === 'del-col') {
+    table.querySelectorAll('tr').forEach((tr) => {
+      if (tr.children[colIdx]) tr.children[colIdx].remove();
+    });
+    if (!table.querySelector('td, th')) table.remove();
+  } else if (op === 'del-table') {
+    table.remove();
+  }
+
+  ctxTableCell = null;
+  editor.focus();
+  markActiveDirty();
+  updateStats();
+  scheduleAutosave();
+}
+
+window.api.onTableOp(tableOp);
+
 // Enter внутри чек-листа: новый пункт должен сразу получить свой чекбокс.
 editor.addEventListener('keyup', (e) => {
   if (e.key !== 'Enter') return;
@@ -939,9 +997,14 @@ function buildColorGrid(container, onPick) {
 const foreColorDropdown = document.getElementById('foreColorDropdown');
 const hiliteColorDropdown = document.getElementById('hiliteColorDropdown');
 
+const bubbleForeDropdown = document.getElementById('bubbleForeDropdown');
+const bubbleHiliteDropdown = document.getElementById('bubbleHiliteDropdown');
+
 function closeColorDropdowns() {
   foreColorDropdown.classList.add('hidden');
   hiliteColorDropdown.classList.add('hidden');
+  bubbleForeDropdown.classList.add('hidden');
+  bubbleHiliteDropdown.classList.add('hidden');
 }
 
 // «Недавние цвета» — общий список для текста и выделения, как в макете.
@@ -1029,7 +1092,24 @@ function applyHiliteColor(c) {
 
 buildColorGrid(document.getElementById('foreColorGrid'), applyForeColor);
 buildColorGrid(document.getElementById('hiliteColorGrid'), applyHiliteColor);
+buildColorGrid(document.getElementById('bubbleForeGrid'), applyForeColor);
+buildColorGrid(document.getElementById('bubbleHiliteGrid'), applyHiliteColor);
 renderRecentColors();
+
+function wireColorTrigger(triggerId, dropdown) {
+  document.getElementById(triggerId).addEventListener('click', (e) => {
+    e.stopPropagation();
+    const willOpen = dropdown.classList.contains('hidden');
+    closeColorDropdowns();
+    if (willOpen) {
+      saveSelection();
+      dropdown.classList.remove('hidden');
+    }
+  });
+}
+
+wireColorTrigger('bubbleForeTrigger', bubbleForeDropdown);
+wireColorTrigger('bubbleHiliteBtn', bubbleHiliteDropdown);
 
 document.getElementById('foreColorTrigger').addEventListener('click', (e) => {
   e.stopPropagation();
@@ -1125,9 +1205,22 @@ if (window.EyeDropper) {
   });
 }
 
-document.getElementById('bubbleHiliteBtn').addEventListener('click', () => {
+const bubbleFontSizeEl = document.getElementById('bubbleFontSize');
+bubbleFontSizeEl.addEventListener('focus', saveSelection);
+bubbleFontSizeEl.addEventListener('change', (e) => {
+  const px = Math.max(1, Math.min(400, parseInt(e.target.value, 10) || 12));
+  e.target.value = px;
+  fontSizeInputEl.value = px;
+  setFontSizePx(px);
+});
+
+document.getElementById('bubbleLinkBtn').addEventListener('click', () => {
+  document.getElementById('btnLink').click();
+});
+
+document.getElementById('bubbleClearBtn').addEventListener('click', () => {
   editor.focus();
-  document.execCommand('hiliteColor', false, lastHiliteColor);
+  document.execCommand('removeFormat');
   markActiveDirty();
   scheduleAutosave();
 });
@@ -1200,7 +1293,10 @@ function applyFontControlsFromNode(node, useCommandValue) {
   }
 
   const size = parseInt(computed.fontSize, 10);
-  if (size) fontSizeInput.value = size;
+  if (size) {
+    fontSizeInput.value = size;
+    document.getElementById('bubbleFontSize').value = size;
+  }
 }
 
 function syncFontControls() {
@@ -1231,6 +1327,9 @@ editor.addEventListener('mouseup', updateToolbarState);
 const bubbleToolbar = document.getElementById('bubbleToolbar');
 
 function updateBubbleToolbar() {
+  // Пока пользователь работает с самой панелью (поле размера, выбор шрифта,
+  // палитра) — не прятать её, даже если выделение в документе «погасло».
+  if (bubbleToolbar.contains(document.activeElement)) return;
   const sel = window.getSelection();
   if (!sel || sel.isCollapsed || sel.rangeCount === 0 || !editor.contains(sel.anchorNode)) {
     bubbleToolbar.classList.add('hidden');

@@ -334,13 +334,28 @@
 
       <div id="bubbleToolbar" class="bubble-toolbar hidden">
         <select id="bubbleFontName" title="Шрифт"></select>
+        <input type="number" id="bubbleFontSize" list="fontSizePresets" min="1" max="400" title="Размер шрифта" />
         <span class="bubble-sep"></span>
         <button data-cmd="bold" title="Жирный"><b>Ж</b></button>
         <button data-cmd="italic" title="Курсив"><i>К</i></button>
         <button data-cmd="underline" title="Подчёркнутый"><u>Ч</u></button>
         <button data-cmd="strikeThrough" title="Зачёркнутый"><s>Ы</s></button>
         <span class="bubble-sep"></span>
-        <button id="bubbleHiliteBtn" title="Выделить цветом">🖊</button>
+        <div class="color-trigger-wrap" data-color-wrap>
+          <button id="bubbleForeTrigger" title="Цвет текста">А</button>
+          <div class="color-dropdown hidden" id="bubbleForeDropdown">
+            <div class="color-grid" id="bubbleForeGrid"></div>
+          </div>
+        </div>
+        <div class="color-trigger-wrap" data-color-wrap>
+          <button id="bubbleHiliteBtn" title="Выделить цветом">🖊</button>
+          <div class="color-dropdown hidden" id="bubbleHiliteDropdown">
+            <div class="color-grid" id="bubbleHiliteGrid"></div>
+          </div>
+        </div>
+        <span class="bubble-sep"></span>
+        <button id="bubbleLinkBtn" title="Вставить ссылку (Ctrl+K)">⛓</button>
+        <button id="bubbleClearBtn" title="Очистить форматирование">A̶</button>
       </div>
 
       <div id="statusBar">

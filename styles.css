@@ -969,6 +969,25 @@ button, input, select { font-family: inherit; }
   outline: none;
 }
 
+.bubble-toolbar input[type="number"] {
+  height: 28px;
+  width: 52px;
+  border: none;
+  border-radius: 8px;
+  background: oklch(30% .008 90);
+  color: #fff;
+  font-size: 12.5px;
+  padding: 0 6px;
+  outline: none;
+}
+
+/* Дропдауны палитры внутри всплывающей панели открываются вниз от неё */
+.bubble-toolbar .color-dropdown {
+  top: 34px;
+  left: auto;
+  right: 0;
+}
+
 /* ---- Status bar ---- */
 
 #statusBar {

@@ -43,6 +43,7 @@ contextBridge.exposeInMainWorld('api', {
   onTabMenuNew: (cb) => ipcRenderer.on('tab-menu-new', cb),
   onTabMenuClose: (cb) => ipcRenderer.on('tab-menu-close', (e, id) => cb(id)),
   onTabMenuCloseOthers: (cb) => ipcRenderer.on('tab-menu-close-others', (e, id) => cb(id)),
+  onTableOp: (cb) => ipcRenderer.on('table-op', (e, op) => cb(op)),
 
   onUpdateAvailable: (cb) => ipcRenderer.on('update-available', (e, info) => cb(info)),
   onUpdateNotAvailable: (cb) => ipcRenderer.on('update-not-available', cb),

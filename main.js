@@ -149,9 +149,16 @@ function createWindow() {
     win.webContents.send('apply-theme', settings.theme);
   });
 
-  win.webContents.on('context-menu', (event, params) => {
+  win.webContents.on('context-menu', async (event, params) => {
     const menuItems = [];
     const ses = win.webContents.session;
+
+    // Рендерер помечает, был ли правый клик внутри ячейки таблицы
+    // (DOM-обработчик contextmenu срабатывает раньше этого события).
+    let inTable = false;
+    try {
+      inTable = await win.webContents.executeJavaScript('window.__literaTableCtx === true');
+    } catch (e) {}
 
     if (params.misspelledWord) {
       for (const suggestion of params.dictionarySuggestions) {
@@ -184,6 +191,25 @@ function createWindow() {
         label: 'Вставить ссылку',
         accelerator: 'CmdOrCtrl+K',
         click: () => win.webContents.send('trigger-insert-link'),
+      });
+    }
+
+    if (inTable) {
+      const op = (name) => () => win.webContents.send('table-op', name);
+      menuItems.push({ type: 'separator' });
+      menuItems.push({
+        label: 'Таблица',
+        submenu: [
+          { label: 'Вставить строку выше', click: op('row-above') },
+          { label: 'Вставить строку ниже', click: op('row-below') },
+          { label: 'Вставить столбец слева', click: op('col-left') },
+          { label: 'Вставить столбец справа', click: op('col-right') },
+          { type: 'separator' },
+          { label: 'Удалить строку', click: op('del-row') },
+          { label: 'Удалить столбец', click: op('del-col') },
+          { type: 'separator' },
+          { label: 'Удалить таблицу', click: op('del-table') },
+        ],
       });
     }
 
@@ -437,13 +463,60 @@ ipcMain.handle('open-path', async (event, filePath) => {
   return readFileForEditor(filePath);
 });
 
+// ---- Подготовка HTML для записи в .docx ----
+// 1) html-to-docx выдаёт ПУСТОЙ документ, если встречает <font>-теги
+//    (их создаёт execCommand с цветами) — конвертируем их в span со стилями.
+// 2) Чекбоксы чек-листов не существуют в docx — заменяем на символы ☑/☐,
+//    при открытии файла превращаем обратно в интерактивный чек-лист.
+function prepareHtmlForExport(html) {
+  let out = html
+    .replace(/<font([^>]*)>/gi, (m, attrs) => {
+      const styles = [];
+      const color = attrs.match(/color="([^"]*)"/i);
+      if (color) styles.push(`color: ${color[1]}`);
+      const face = attrs.match(/face="([^"]*)"/i);
+      if (face) styles.push(`font-family: ${face[1]}`);
+      const size = attrs.match(/size="([^"]*)"/i);
+      if (size) {
+        const map = { 1: '8px', 2: '10px', 3: '12px', 4: '14px', 5: '18px', 6: '24px', 7: '32px' };
+        if (map[size[1]]) styles.push(`font-size: ${map[size[1]]}`);
+      }
+      return styles.length ? `<span style="${styles.join('; ')};">` : '<span>';
+    })
+    .replace(/<\/font>/gi, '</span>');
+
+  out = out
+    .replace(/<li([^>]*)>\s*<input([^>]*type="checkbox"[^>]*)>\s*/gi, (m, liAttrs, inputAttrs) => {
+      const checked = /(\s|^)checked(\s|=|$)/i.test(inputAttrs);
+      return `<li>${checked ? '☑' : '☐'} `;
+    })
+    .replace(/<input[^>]*>/gi, '');
+
+  return out;
+}
+
+// Обратное преобразование при чтении .docx: пункты списка, начинающиеся
+// с ☑/☐, снова становятся чек-листом с настоящими чекбоксами.
+function restoreChecklists(html) {
+  let out = html.replace(/<li>\s*(☑|☐)\s*/g, (m, box) => {
+    const checked = box === '☑';
+    return `<li${checked ? ' class="done"' : ''}><input type="checkbox" contenteditable="false"${checked ? ' checked' : ''}> `;
+  });
+  out = out.replace(/<ul>(\s*<li[^>]*>\s*<input type="checkbox")/g, '<ul class="checklist">$1');
+  return out;
+}
+
 async function readFileForEditor(filePath) {
   const ext = path.extname(filePath).toLowerCase();
   let html;
   if (ext === '.docx') {
     const mammoth = require('mammoth');
-    const result = await mammoth.convertToHtml({ path: filePath });
-    html = result.value;
+    const result = await mammoth.convertToHtml(
+      { path: filePath },
+      // Подчёркивание и зачёркивание mammoth по умолчанию игнорирует
+      { styleMap: ['u => u', 'strike => s'] }
+    );
+    html = restoreChecklists(result.value);
   } else if (ext === '.txt') {
     const raw = fs.readFileSync(filePath, 'utf-8');
     const esc = raw
@@ -462,13 +535,14 @@ async function writeFile(filePath, html) {
   const ext = path.extname(filePath).toLowerCase();
   if (ext === '.docx') {
     const HTMLtoDOCX = require('html-to-docx');
-    const buffer = await HTMLtoDOCX(html, null, {
+    const buffer = await HTMLtoDOCX(prepareHtmlForExport(html), null, {
       table: { row: { cantSplit: true } },
       footer: false,
       pageNumber: false,
     });
     fs.writeFileSync(filePath, buffer);
   } else if (ext === '.txt') {
+    html = prepareHtmlForExport(html);
     const text = html
       .replace(/<\/(p|div|li|h[1-6]|tr)>/gi, '\n')
       .replace(/<br\s*\/?>/gi, '\n')
@@ -580,7 +654,7 @@ ipcMain.handle('export-docx', async (event, html) => {
   });
   if (result.canceled || !result.filePath) return null;
   const HTMLtoDOCX = require('html-to-docx');
-  const fileBuffer = await HTMLtoDOCX(html, null, {
+  const fileBuffer = await HTMLtoDOCX(prepareHtmlForExport(html), null, {
     table: { row: { cantSplit: true } },
     footer: false,
     pageNumber: false,
