@@ -396,6 +396,104 @@ function showRecoveryModal(count) {
   });
 }
 
+// ---- Приветственная презентация (только при самом первом запуске) ----
+
+const ONBOARDING_SLIDES = [
+  {
+    icon: '👋',
+    title: 'Добро пожаловать в Литеру!',
+    text: 'Красивый и быстрый текстовый редактор. Покажем, что здесь есть — это займёт полминуты.',
+  },
+  {
+    icon: '🗂',
+    title: 'Вкладки и стартовый экран',
+    text: 'Работайте с несколькими документами во вкладках, как в браузере: перетаскивание, средний клик, Ctrl+Tab. Новая вкладка (Ctrl+N) открывает стартовый экран с шаблонами и недавними файлами.',
+  },
+  {
+    icon: '✍️',
+    title: 'Форматирование как в Word',
+    text: 'Лента с пятью вкладками: шрифты, цвета с палитрой и пипеткой, чек-листы, таблицы (правый клик по ячейке — редактирование). Выделите текст — появится мини-панель форматирования.',
+  },
+  {
+    icon: '💾',
+    title: 'Сохранение и автосохранение',
+    text: 'Заголовок документа — это имя файла. Сохраняйте в Word (.docx), TXT или HTML, экспортируйте в PDF. Автосохранение бережёт работу, а после сбоя Литера предложит всё восстановить.',
+  },
+  {
+    icon: '🌙',
+    title: 'Мелочи, которые приятно',
+    text: 'Тёмная и светлая тема, режим фокуса (F9), масштаб в статус-баре, проверка орфографии на русском и английском, поиск и замена (Ctrl+F).',
+  },
+  {
+    icon: '🚀',
+    title: 'Всегда свежая версия',
+    text: 'Литера сама проверяет обновления и предлагает установить их в один клик. Готово — приятной работы!',
+  },
+];
+
+const onboardingModal = document.getElementById('onboardingModal');
+const onboardingHeroEl = document.getElementById('onboardingHero');
+const onboardingTitleEl = document.getElementById('onboardingTitle');
+const onboardingTextEl = document.getElementById('onboardingText');
+const onboardingDotsEl = document.getElementById('onboardingDots');
+const onboardingPrevBtn = document.getElementById('onboardingPrevBtn');
+const onboardingNextBtn = document.getElementById('onboardingNextBtn');
+const onboardingSkipBtn = document.getElementById('onboardingSkipBtn');
+
+let onboardingIdx = 0;
+
+function renderOnboardingSlide() {
+  const slide = ONBOARDING_SLIDES[onboardingIdx];
+  onboardingHeroEl.textContent = slide.icon;
+  onboardingTitleEl.textContent = slide.title;
+  onboardingTextEl.textContent = slide.text;
+  onboardingDotsEl.innerHTML = '';
+  ONBOARDING_SLIDES.forEach((s, i) => {
+    const dot = document.createElement('span');
+    dot.className = 'onboarding-dot' + (i === onboardingIdx ? ' active' : '');
+    dot.addEventListener('click', () => { onboardingIdx = i; renderOnboardingSlide(); });
+    onboardingDotsEl.appendChild(dot);
+  });
+  onboardingPrevBtn.style.visibility = onboardingIdx === 0 ? 'hidden' : 'visible';
+  onboardingNextBtn.textContent = onboardingIdx === ONBOARDING_SLIDES.length - 1 ? 'Начать работу' : 'Далее';
+}
+
+async function closeOnboarding() {
+  onboardingModal.classList.add('hidden');
+  if (!settings.onboardingShown) {
+    settings = await window.api.saveSettings({ onboardingShown: true });
+  }
+}
+
+function showOnboarding() {
+  onboardingIdx = 0;
+  renderOnboardingSlide();
+  onboardingModal.classList.remove('hidden');
+}
+
+onboardingNextBtn.addEventListener('click', () => {
+  if (onboardingIdx === ONBOARDING_SLIDES.length - 1) {
+    closeOnboarding();
+  } else {
+    onboardingIdx += 1;
+    renderOnboardingSlide();
+  }
+});
+
+onboardingPrevBtn.addEventListener('click', () => {
+  if (onboardingIdx > 0) {
+    onboardingIdx -= 1;
+    renderOnboardingSlide();
+  }
+});
+
+onboardingSkipBtn.addEventListener('click', closeOnboarding);
+
+document.getElementById('settingsOnboardingBtn').addEventListener('click', () => {
+  closeSettingsModal();
+  showOnboarding();
+});
+
 // ---- Автообновление ----
 
 const updateModal = document.getElementById('updateModal');
@@ -1994,6 +2092,7 @@ async function init() {
   settings = await window.api.getSettings();
   applyTheme(settings.theme === 'dark');
   initAppVersion();
+  if (!settings.onboardingShown) showOnboarding();
 
   const recoveries = await window.api.listRecoveries();
   if (recoveries.length > 0) {

@@ -1344,6 +1344,80 @@ body.focus-mode #statusBar {
   text-decoration: underline;
 }
 
+/* ---- Приветственная презентация ---- */
+
+.onboarding-card {
+  width: 440px;
+  padding: 0 0 20px;
+  overflow: hidden;
+  text-align: center;
+  position: relative;
+}
+
+.onboarding-hero {
+  height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 58px;
+  background: linear-gradient(135deg, #7C93FF, #8B5CF6);
+  margin-bottom: 18px;
+  user-select: none;
+}
+
+.onboarding-card h3 {
+  font-size: 18px;
+  margin: 0 24px 10px;
+}
+
+.onboarding-card .modal-message {
+  margin: 0 26px 14px;
+  min-height: 80px;
+}
+
+.onboarding-skip {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  border: none;
+  background: rgba(255, 255, 255, .18);
+  color: #fff;
+  font-size: 11.5px;
+  border-radius: 14px;
+  padding: 4px 11px;
+  cursor: pointer;
+}
+
+.onboarding-skip:hover {
+  background: rgba(255, 255, 255, .3);
+}
+
+.onboarding-dots {
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+  margin-bottom: 16px;
+}
+
+.onboarding-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--btn-hover);
+  cursor: pointer;
+  transition: background .15s, transform .15s;
+}
+
+.onboarding-dot.active {
+  background: var(--accent);
+  transform: scale(1.25);
+}
+
+.onboarding-actions {
+  justify-content: space-between;
+  padding: 0 20px;
+}
+
 /* ---- Модальное окно обновления ---- */
 
 .update-modal {

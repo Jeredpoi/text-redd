@@ -461,6 +461,20 @@
     </div>
   </div>
 
+  <div id="onboardingModal" class="modal-overlay hidden">
+    <div class="modal onboarding-card">
+      <button id="onboardingSkipBtn" class="onboarding-skip" type="button">Пропустить</button>
+      <div class="onboarding-hero" id="onboardingHero">👋</div>
+      <h3 id="onboardingTitle"></h3>
+      <p id="onboardingText" class="modal-message"></p>
+      <div class="onboarding-dots" id="onboardingDots"></div>
+      <div class="modal-actions onboarding-actions">
+        <button id="onboardingPrevBtn" class="btn-secondary">Назад</button>
+        <button id="onboardingNextBtn" class="btn-primary">Далее</button>
+      </div>
+    </div>
+  </div>
+
   <div id="updateModal" class="modal-overlay hidden">
     <div class="modal update-modal">
       <div class="update-modal-icon">
@@ -548,7 +562,11 @@
 
       <div class="settings-about">
         <span id="settingsVersionText">Литера · версия 1.0.0</span>
-        <button id="settingsCheckUpdateBtn" class="link-btn" type="button">Проверить обновления</button>
+        <span>
+          <button id="settingsOnboardingBtn" class="link-btn" type="button">Что умеет Литера</button>
+          ·
+          <button id="settingsCheckUpdateBtn" class="link-btn" type="button">Проверить обновления</button>
+        </span>
       </div>
 
       <div class="modal-actions">
