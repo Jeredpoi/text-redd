@@ -404,6 +404,7 @@ const updateProgressFillEl = document.getElementById('updateProgressFill');
 const updateProgressLabelEl = document.getElementById('updateProgressLabel');
 const updateLaterBtn = document.getElementById('updateLaterBtn');
 const updateActionBtn = document.getElementById('updateActionBtn');
+const updateReleaseNotesEl = document.getElementById('updateReleaseNotes');
 const settingsVersionTextEl = document.getElementById('settingsVersionText');
 
 let updateState = 'idle';
@@ -411,6 +412,15 @@ let updateState = 'idle';
 function showUpdateAvailable(info) {
   updateState = 'available';
   updateModalMessageEl.textContent = `Вышла новая версия ${info.version}. Скачать и установить сейчас?`;
+  // Описание релиза с GitHub приходит как HTML — показываем только текст,
+  // превращая границы блоков в переносы строк.
+  const notesDiv = document.createElement('div');
+  notesDiv.innerHTML = (info.releaseNotes || '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|li|h[1-6]|tr|ul|ol)>/gi, '\n');
+  const notesText = (notesDiv.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
+  updateReleaseNotesEl.textContent = notesText;
+  updateReleaseNotesEl.classList.toggle('hidden', !notesText);
   updateProgressWrapEl.classList.add('hidden');
   updateActionBtn.disabled = false;
   updateActionBtn.textContent = 'Скачать и установить';
@@ -422,6 +432,7 @@ function showUpdateAvailable(info) {
 function showUpdateDownloading() {
   updateState = 'downloading';
   updateModalMessageEl.textContent = 'Загрузка обновления…';
+  updateReleaseNotesEl.classList.add('hidden');
   updateProgressWrapEl.classList.remove('hidden');
   updateProgressFillEl.style.width = '0%';
   updateProgressLabelEl.textContent = '0%';
@@ -543,10 +554,13 @@ function updateStats() {
   const text = editor.innerText || '';
   const words = text.trim().length ? text.trim().split(/\s+/).length : 0;
   const chars = text.length;
-  statsEl.textContent = `Слов: ${words} · Символов: ${chars}`;
+  const minutes = Math.max(1, Math.round(words / 200));
+  statsEl.textContent = words > 0
+    ? `Слов: ${words} · Символов: ${chars} · ≈ ${minutes} мин чтения`
+    : `Слов: ${words} · Символов: ${chars}`;
   toolsWordCountEl.textContent = words;
   toolsCharCountEl.textContent = chars;
-  toolsReadingMinutesEl.textContent = Math.max(1, Math.round(words / 200));
+  toolsReadingMinutesEl.textContent = minutes;
 }
 
 editor.addEventListener('input', () => {
@@ -830,10 +844,53 @@ function closeColorDropdowns() {
   hiliteColorDropdown.classList.add('hidden');
 }
 
+// «Недавние цвета» — общий список для текста и выделения, как в макете.
+const RECENT_COLORS_KEY = 'litera-recent-colors';
+
+function loadRecentColors() {
+  try {
+    const list = JSON.parse(localStorage.getItem(RECENT_COLORS_KEY));
+    return Array.isArray(list) ? list.filter((c) => /^#[0-9a-f]{6}$/i.test(c)) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function renderRecentColors() {
+  const colors = loadRecentColors();
+  [
+    { row: 'foreColorRecentRow', box: 'foreColorRecent', apply: (c) => applyForeColor(c) },
+    { row: 'hiliteColorRecentRow', box: 'hiliteColorRecent', apply: (c) => applyHiliteColor(c) },
+  ].forEach(({ row, box, apply }) => {
+    const rowEl = document.getElementById(row);
+    const boxEl = document.getElementById(box);
+    boxEl.innerHTML = '';
+    rowEl.classList.toggle('hidden', colors.length === 0);
+    colors.forEach((c) => {
+      const sw = document.createElement('div');
+      sw.className = 'color-swatch';
+      sw.style.background = c;
+      sw.title = c;
+      sw.addEventListener('click', () => apply(c));
+      boxEl.appendChild(sw);
+    });
+  });
+}
+
+function addRecentColor(c) {
+  if (!/^#[0-9a-f]{6}$/i.test(c)) return;
+  const list = [c.toLowerCase(), ...loadRecentColors().filter((x) => x.toLowerCase() !== c.toLowerCase())].slice(0, 8);
+  try {
+    localStorage.setItem(RECENT_COLORS_KEY, JSON.stringify(list));
+  } catch (e) {}
+  renderRecentColors();
+}
+
 function applyForeColor(c) {
   restoreSelection();
   document.execCommand('foreColor', false, c);
   document.getElementById('foreColorBar').style.background = c;
+  addRecentColor(c);
   markActiveDirty();
   scheduleAutosave();
 }
@@ -864,6 +921,7 @@ function applyHiliteColor(c) {
   if (target !== 'transparent') {
     lastHiliteColor = c;
     document.getElementById('hiliteColorBar').style.background = c;
+    addRecentColor(c);
   }
   markActiveDirty();
   scheduleAutosave();
@@ -871,6 +929,7 @@ function applyHiliteColor(c) {
 
 buildColorGrid(document.getElementById('foreColorGrid'), applyForeColor);
 buildColorGrid(document.getElementById('hiliteColorGrid'), applyHiliteColor);
+renderRecentColors();
 
 document.getElementById('foreColorTrigger').addEventListener('click', (e) => {
   e.stopPropagation();
@@ -907,6 +966,7 @@ foreColorCustomInputEl.addEventListener('input', (e) => {
   editor.focus();
   if (!applied) document.execCommand('foreColor', false, c);
   document.getElementById('foreColorBar').style.background = c;
+  addRecentColor(c);
   markActiveDirty();
   scheduleAutosave();
   closeColorDropdowns();
@@ -921,10 +981,49 @@ hiliteColorCustomInputEl.addEventListener('input', (e) => {
   if (!applied) document.execCommand('hiliteColor', false, c);
   lastHiliteColor = c;
   document.getElementById('hiliteColorBar').style.background = c;
+  addRecentColor(c);
   markActiveDirty();
   scheduleAutosave();
   closeColorDropdowns();
 });
+
+// Пипетка (EyeDropper API есть в Chromium/Electron; кнопки видимы, только
+// если API доступен). Выделение уже сохранено при открытии дропдауна.
+if (window.EyeDropper) {
+  const foreEyedropperBtn = document.getElementById('foreEyedropperBtn');
+  const hiliteEyedropperBtn = document.getElementById('hiliteEyedropperBtn');
+  foreEyedropperBtn.classList.remove('hidden');
+  hiliteEyedropperBtn.classList.remove('hidden');
+
+  async function pickWithEyedropper(applyStyleProp, afterPick) {
+    closeColorDropdowns();
+    try {
+      const result = await new window.EyeDropper().open();
+      const c = result.sRGBHex;
+      const applied = applyInlineStyleToRange(savedRange, (span) => { span.style[applyStyleProp] = c; });
+      editor.focus();
+      afterPick(c, applied);
+      addRecentColor(c);
+      markActiveDirty();
+      scheduleAutosave();
+    } catch (e) {} // пользователь отменил выбор — это не ошибка
+  }
+
+  foreEyedropperBtn.addEventListener('click', () => {
+    pickWithEyedropper('color', (c, applied) => {
+      if (!applied) document.execCommand('foreColor', false, c);
+      document.getElementById('foreColorBar').style.background = c;
+    });
+  });
+
+  hiliteEyedropperBtn.addEventListener('click', () => {
+    pickWithEyedropper('backgroundColor', (c, applied) => {
+      if (!applied) document.execCommand('hiliteColor', false, c);
+      lastHiliteColor = c;
+      document.getElementById('hiliteColorBar').style.background = c;
+    });
+  });
+}
 
 document.getElementById('bubbleHiliteBtn').addEventListener('click', () => {
   editor.focus();
@@ -1511,6 +1610,18 @@ document.addEventListener('keydown', (e) => {
   if (mod && !e.shiftKey && key === 'n') { e.preventDefault(); newTab(); return; }
   if (mod && key === 'o') { e.preventDefault(); openFile(); return; }
   if (mod && e.shiftKey && key === 's') { e.preventDefault(); saveActiveTabAs(); return; }
+  if (mod && e.shiftKey && key === 'v') {
+    e.preventDefault();
+    editor.focus();
+    navigator.clipboard.readText().then((text) => {
+      if (text) {
+        document.execCommand('insertText', false, text);
+        markActiveDirty();
+        scheduleAutosave();
+      }
+    }).catch(() => {});
+    return;
+  }
   if (mod && key === 's') { e.preventDefault(); saveActiveTab(); return; }
   if (mod && key === 'p') { e.preventDefault(); window.api.print(); return; }
   if (mod && key === 'w') { e.preventDefault(); closeTab(activeTabId); return; }

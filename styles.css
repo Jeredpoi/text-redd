@@ -608,6 +608,88 @@ button, input, select { font-family: inherit; }
   background: var(--input-bg);
 }
 
+.eyedropper-btn {
+  margin-left: auto;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  background: var(--input-bg);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.eyedropper-btn:hover {
+  background: var(--btn-hover);
+  color: var(--text);
+}
+
+.eyedropper-btn svg {
+  stroke: currentColor;
+  stroke-width: 2;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.eyedropper-btn.hidden {
+  display: none;
+}
+
+.color-recent-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.color-recent-row.hidden {
+  display: none;
+}
+
+.color-recent-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  flex: none;
+}
+
+.color-recent-swatches {
+  display: flex;
+  gap: 4px;
+}
+
+.color-recent-swatches .color-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  cursor: pointer;
+  border: 1px solid rgba(128, 128, 128, .35);
+}
+
+.update-release-notes {
+  max-height: 120px;
+  overflow-y: auto;
+  text-align: left;
+  white-space: pre-line;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 14px;
+}
+
+.update-release-notes.hidden {
+  display: none;
+}
+
 .tools-panel {
   gap: 24px !important;
   font-size: 13px;
