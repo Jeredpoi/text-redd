@@ -988,6 +988,189 @@ button, input, select { font-family: inherit; }
   right: 0;
 }
 
+/* ---- Стартовый экран ---- */
+
+#startScreen {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 26px 12px 60px;
+}
+
+#startScreen.hidden { display: none; }
+#page.hidden { display: none; }
+
+.start-greeting {
+  font-family: 'Lora', Georgia, serif;
+  font-size: 34px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.start-subtitle {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 6px 0 26px;
+}
+
+.start-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin: 22px 0 12px;
+}
+
+.start-section-title.hidden { display: none; }
+
+.start-templates {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.tpl-card {
+  background: var(--paper-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 22px 14px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .15s, transform .15s, box-shadow .15s;
+}
+
+.tpl-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+
+.tpl-card-icon {
+  font-size: 30px;
+  line-height: 1;
+  margin-bottom: 12px;
+}
+
+.tpl-card-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.start-recents {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.recent-card {
+  cursor: pointer;
+}
+
+.recent-card-preview {
+  height: 92px;
+  background: var(--paper-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color .15s, box-shadow .15s;
+}
+
+.recent-card:hover .recent-card-preview {
+  border-color: var(--accent);
+  box-shadow: var(--shadow);
+}
+
+.recent-card-ext {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 6px;
+  padding: 3px 8px;
+}
+
+.recent-card-name {
+  font-size: 12.5px;
+  color: var(--text);
+  margin-top: 7px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- Масштаб в статус-баре ---- */
+
+#zoomControl {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#zoomControl button {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+
+#zoomControl button:hover {
+  background: var(--btn-hover);
+  color: var(--text);
+}
+
+#zoomSlider {
+  width: 90px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+#zoomLabel {
+  min-width: 42px;
+  text-align: center;
+}
+
+/* ---- Режим фокуса ---- */
+
+body.focus-mode #sidebar,
+body.focus-mode #tabBar,
+body.focus-mode .ribbon-tabs,
+body.focus-mode .ribbon-panel,
+body.focus-mode #findBar,
+body.focus-mode #statusBar {
+  display: none !important;
+}
+
+#focusExitBtn {
+  position: fixed;
+  top: 14px;
+  right: 16px;
+  z-index: 45;
+  border: 1px solid var(--border);
+  background: var(--modal-bg);
+  color: var(--text-secondary);
+  font-size: 12px;
+  border-radius: 20px;
+  padding: 6px 14px;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  opacity: .4;
+  transition: opacity .15s;
+}
+
+#focusExitBtn:hover {
+  opacity: 1;
+  color: var(--text);
+}
+
+#focusExitBtn.hidden { display: none; }
+
 /* ---- Status bar ---- */
 
 #statusBar {

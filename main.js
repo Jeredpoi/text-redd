@@ -329,6 +329,11 @@ ipcMain.handle('zoom-reset', (event) => {
   event.sender.setZoomLevel(0);
 });
 
+ipcMain.handle('set-zoom-factor', (event, factor) => {
+  const f = Math.min(2, Math.max(0.5, Number(factor) || 1));
+  event.sender.setZoomFactor(f);
+});
+
 ipcMain.handle('toggle-fullscreen', (event) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   if (win) win.setFullScreen(!win.isFullScreen());

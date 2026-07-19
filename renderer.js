@@ -88,6 +88,7 @@ function loadTabIntoDOM(tab) {
   updateStats();
   computeOutline();
   applyFontControlsFromNode(editor.firstElementChild || editor, false);
+  updateStartScreenVisibility();
 }
 
 function updateWindowTitle() {
@@ -568,6 +569,7 @@ editor.addEventListener('input', () => {
   updateStats();
   computeOutline();
   scheduleAutosave();
+  updateStartScreenVisibility();
 });
 
 docTitle.addEventListener('input', () => {
@@ -580,6 +582,7 @@ docTitle.addEventListener('input', () => {
     updateWindowTitle();
   }
   scheduleAutosave();
+  updateStartScreenVisibility();
 });
 
 // ---- Оглавление ----
@@ -656,11 +659,152 @@ function renderRecentList() {
 async function refreshRecentFiles() {
   recentFilesCache = await window.api.getRecentFiles();
   renderRecentList();
+  updateStartScreenVisibility();
 }
 
 recentSearchEl.addEventListener('input', renderRecentList);
 window.api.onRecentFilesChanged(refreshRecentFiles);
 window.api.onOpenRecentPath((p) => openPath(p));
+
+// ---- Стартовый экран (шаблоны + недавние), как в Google Docs ----
+
+const startScreenEl = document.getElementById('startScreen');
+const startGreetingEl = document.getElementById('startGreeting');
+const startTemplatesEl = document.getElementById('startTemplates');
+const startRecentsEl = document.getElementById('startRecents');
+const startRecentTitleEl = document.getElementById('startRecentTitle');
+const pageEl = document.getElementById('page');
+
+const TEMPLATES = [
+  {
+    id: 'blank', name: 'Пустой документ', icon: '＋', title: '', html: '',
+  },
+  {
+    id: 'note', name: 'Заметка', icon: '📝', title: 'Заметка',
+    html: '<p><i>' + new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }) + '</i></p><p></p><p>Запишите мысли здесь…</p>',
+  },
+  {
+    id: 'letter', name: 'Письмо', icon: '✉️', title: 'Письмо',
+    html: '<p>Здравствуйте, ____!</p><p></p><p>Пишу вам, чтобы…</p><p></p><p>С уважением,<br>____</p>',
+  },
+  {
+    id: 'todo', name: 'Список дел', icon: '✅', title: 'Список дел',
+    html: '<ul class="checklist"><li><input type="checkbox" contenteditable="false"> Первое дело</li><li><input type="checkbox" contenteditable="false"> Второе дело</li><li><input type="checkbox" contenteditable="false"> Третье дело</li></ul>',
+  },
+  {
+    id: 'report', name: 'Отчёт', icon: '📊', title: 'Отчёт',
+    html: '<h2>Итоги</h2><p>Кратко опишите главное…</p><h2>Подробности</h2><table><tbody><tr><td><b>Показатель</b></td><td><b>Значение</b></td></tr><tr><td></td><td></td></tr><tr><td></td><td></td></tr></tbody></table><h2>Выводы</h2><p></p>',
+  },
+];
+
+function startGreetingText() {
+  const h = new Date().getHours();
+  if (h >= 5 && h < 12) return 'Доброе утро';
+  if (h >= 12 && h < 18) return 'Добрый день';
+  if (h >= 18 && h < 23) return 'Добрый вечер';
+  return 'Доброй ночи';
+}
+
+function applyTemplate(tpl) {
+  const tab = getActiveTab();
+  if (!tab) return;
+  tab.startDismissed = true;
+  docTitle.textContent = tpl.title;
+  editor.innerHTML = tpl.html;
+  tab.titleText = tpl.title;
+  tab.bodyHtml = tpl.html;
+  if (tpl.id !== 'blank') markActiveDirty();
+  updateDisplayName(tab);
+  updateActiveTabPillName();
+  updateWindowTitle();
+  updateStats();
+  computeOutline();
+  updateStartScreenVisibility(true);
+  editor.focus();
+}
+
+function renderStartTemplates() {
+  startTemplatesEl.innerHTML = '';
+  TEMPLATES.forEach((tpl) => {
+    const card = document.createElement('div');
+    card.className = 'tpl-card';
+    card.innerHTML = `<div class="tpl-card-icon">${tpl.icon}</div><div class="tpl-card-name">${tpl.name}</div>`;
+    card.addEventListener('click', () => applyTemplate(tpl));
+    startTemplatesEl.appendChild(card);
+  });
+}
+
+function renderStartRecents() {
+  startRecentsEl.innerHTML = '';
+  const list = recentFilesCache.slice(0, 8);
+  startRecentTitleEl.classList.toggle('hidden', list.length === 0);
+  list.forEach((p) => {
+    const name = basename(p);
+    const ext = (name.match(/\.([^.]+)$/) || [, ''])[1].toUpperCase();
+    const card = document.createElement('div');
+    card.className = 'recent-card';
+    card.title = p;
+    card.innerHTML = `<div class="recent-card-preview"><span class="recent-card-ext">${ext}</span></div><div class="recent-card-name">${name.replace(/\.[^.]+$/, '')}</div>`;
+    card.addEventListener('click', () => openPath(p));
+    card.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      window.api.showRecentItemMenu(p);
+    });
+    startRecentsEl.appendChild(card);
+  });
+}
+
+function tabIsPristine(tab) {
+  if (!tab || tab.filePath || tab.isDirty || tab.startDismissed) return false;
+  if ((docTitle.textContent || '').trim() !== '') return false;
+  if ((editor.textContent || '').trim() !== '') return false;
+  if (editor.querySelector('img, table, hr, ul, ol')) return false;
+  return true;
+}
+
+// Показывает стартовый экран на «чистой» вкладке, прячет при работе.
+function updateStartScreenVisibility(forceHide) {
+  const show = !forceHide && tabIsPristine(getActiveTab());
+  if (show) {
+    startGreetingEl.textContent = startGreetingText();
+    renderStartRecents();
+  }
+  startScreenEl.classList.toggle('hidden', !show);
+  pageEl.classList.toggle('hidden', show);
+}
+
+renderStartTemplates();
+
+// ---- Масштаб (слайдер в статус-баре) ----
+
+const zoomSliderEl = document.getElementById('zoomSlider');
+const zoomLabelEl = document.getElementById('zoomLabel');
+let currentZoomPct = 100;
+
+function setZoomPct(pct) {
+  currentZoomPct = Math.min(200, Math.max(50, Math.round(pct / 10) * 10));
+  zoomSliderEl.value = currentZoomPct;
+  zoomLabelEl.textContent = `${currentZoomPct}%`;
+  window.api.setZoomFactor(currentZoomPct / 100);
+}
+
+zoomSliderEl.addEventListener('input', () => setZoomPct(parseInt(zoomSliderEl.value, 10)));
+document.getElementById('zoomInBtn').addEventListener('click', () => setZoomPct(currentZoomPct + 10));
+document.getElementById('zoomOutBtn').addEventListener('click', () => setZoomPct(currentZoomPct - 10));
+zoomLabelEl.addEventListener('click', () => setZoomPct(100));
+
+// ---- Режим фокуса ----
+
+const focusExitBtn = document.getElementById('focusExitBtn');
+
+function setFocusMode(on) {
+  document.body.classList.toggle('focus-mode', on);
+  focusExitBtn.classList.toggle('hidden', !on);
+  if (on) editor.focus();
+}
+
+document.getElementById('btnFocusMode').addEventListener('click', () => setFocusMode(true));
+focusExitBtn.addEventListener('click', () => setFocusMode(false));
 
 // ---- Вкладки ленты ----
 
@@ -1833,10 +1977,15 @@ document.addEventListener('keydown', (e) => {
   if (mod && e.shiftKey && key === 'i') { e.preventDefault(); window.api.toggleDevTools(); return; }
   if (e.key === 'F12') { e.preventDefault(); window.api.toggleDevTools(); return; }
   if (e.key === 'F11') { e.preventDefault(); window.api.toggleFullscreen(); return; }
-  if (mod && (e.key === '=' || e.key === '+')) { e.preventDefault(); window.api.zoomIn(); return; }
-  if (mod && e.key === '-') { e.preventDefault(); window.api.zoomOut(); return; }
-  if (mod && e.key === '0') { e.preventDefault(); window.api.zoomReset(); return; }
-  if (e.key === 'Escape') { closeFindBar(); return; }
+  if (e.key === 'F9') { e.preventDefault(); setFocusMode(!document.body.classList.contains('focus-mode')); return; }
+  if (mod && (e.key === '=' || e.key === '+')) { e.preventDefault(); setZoomPct(currentZoomPct + 10); return; }
+  if (mod && e.key === '-') { e.preventDefault(); setZoomPct(currentZoomPct - 10); return; }
+  if (mod && e.key === '0') { e.preventDefault(); setZoomPct(100); return; }
+  if (e.key === 'Escape') {
+    if (document.body.classList.contains('focus-mode')) { setFocusMode(false); return; }
+    closeFindBar();
+    return;
+  }
 });
 
 // ---- Инициализация ----

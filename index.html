@@ -313,6 +313,11 @@
         <span>Слов: <b id="toolsWordCount">0</b></span>
         <span>Символов: <b id="toolsCharCount">0</b></span>
         <span>≈ <span id="toolsReadingMinutes">1</span> мин чтения</span>
+        <span class="flex-spacer"></span>
+        <button class="pill-btn labeled" id="btnFocusMode" title="Режим фокуса (F9) — скрыть всё, кроме страницы">
+          <svg viewBox="0 0 20 20"><path d="M7 3H4a1 1 0 0 0-1 1v3M13 3h3a1 1 0 0 1 1 1v3M7 17H4a1 1 0 0 1-1-1v-3M13 17h3a1 1 0 0 0 1-1v-3"/></svg>
+          <span>Режим фокуса</span>
+        </button>
       </div>
 
       <div id="findBar" class="hidden">
@@ -326,11 +331,21 @@
       </div>
 
       <div id="pageScroll">
+        <div id="startScreen" class="hidden">
+          <div class="start-greeting" id="startGreeting">Добрый день</div>
+          <div class="start-subtitle">Создайте документ или продолжите работу</div>
+          <div class="start-section-title">Начать</div>
+          <div class="start-templates" id="startTemplates"></div>
+          <div class="start-section-title hidden" id="startRecentTitle">Недавние документы</div>
+          <div class="start-recents" id="startRecents"></div>
+        </div>
         <div id="page">
           <div id="docTitle" contenteditable="true" data-placeholder="Без названия"></div>
           <div id="editor" contenteditable="true" spellcheck="true" data-placeholder="Начните писать…"></div>
         </div>
       </div>
+
+      <button id="focusExitBtn" class="hidden" title="Выйти из режима фокуса (Esc)">✕ Выйти из фокуса</button>
 
       <div id="bubbleToolbar" class="bubble-toolbar hidden">
         <select id="bubbleFontName" title="Шрифт"></select>
@@ -361,6 +376,12 @@
       <div id="statusBar">
         <span id="fileName">Без имени</span>
         <span id="stats">Слов: 0 · Символов: 0</span>
+        <span id="zoomControl">
+          <button id="zoomOutBtn" title="Уменьшить масштаб">−</button>
+          <input type="range" id="zoomSlider" min="50" max="200" step="10" value="100" title="Масштаб" />
+          <button id="zoomInBtn" title="Увеличить масштаб">+</button>
+          <button id="zoomLabel" title="Сбросить масштаб (Ctrl+0)">100%</button>
+        </span>
         <span id="savedIndicator"><span id="savedDot"></span><span id="savedState">Сохранено</span></span>
       </div>
     </div>

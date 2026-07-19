@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('api', {
   zoomIn: () => ipcRenderer.invoke('zoom-in'),
   zoomOut: () => ipcRenderer.invoke('zoom-out'),
   zoomReset: () => ipcRenderer.invoke('zoom-reset'),
+  setZoomFactor: (f) => ipcRenderer.invoke('set-zoom-factor', f),
   toggleFullscreen: () => ipcRenderer.invoke('toggle-fullscreen'),
   toggleDevTools: () => ipcRenderer.invoke('toggle-devtools'),
 
