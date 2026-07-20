@@ -116,7 +116,8 @@ function markActiveDirty() {
 function applyDefaultFont() {
   if (!settings) return;
   editor.style.fontFamily = settings.defaultFontName;
-  editor.style.fontSize = `${settings.defaultFontSize || 15}px`;
+  // Размеры считаем в пунктах, как в Word: 12 пт = 16 px
+  editor.style.fontSize = `${settings.defaultFontSize || 12}pt`;
   document.getElementById('fontName').value = settings.defaultFontName;
   document.getElementById('bubbleFontName').value = settings.defaultFontName;
   document.getElementById('fontSize').value = settings.defaultFontSize || 15;
@@ -1073,8 +1074,8 @@ bubbleFontNameEl.addEventListener('mousedown', saveSelection);
 bubbleFontNameEl.addEventListener('focus', saveSelection);
 bubbleFontNameEl.addEventListener('change', onFontNameChange);
 
-function setFontSizePx(px) {
-  applyTextStyle((span) => { span.style.fontSize = `${px}px`; });
+function setFontSizePt(pt) {
+  applyTextStyle((span) => { span.style.fontSize = `${pt}pt`; });
   updateStats();
 }
 
@@ -1083,7 +1084,7 @@ fontSizeInputEl.addEventListener('focus', saveSelection);
 fontSizeInputEl.addEventListener('change', (e) => {
   const px = Math.max(1, Math.min(400, parseInt(e.target.value, 10) || 12));
   e.target.value = px;
-  setFontSizePx(px);
+  setFontSizePt(px);
 });
 
 const blockFormatEl = document.getElementById('blockFormat');
@@ -1558,7 +1559,7 @@ bubbleFontSizeEl.addEventListener('change', (e) => {
   const px = Math.max(1, Math.min(400, parseInt(e.target.value, 10) || 12));
   e.target.value = px;
   fontSizeInputEl.value = px;
-  setFontSizePx(px);
+  setFontSizePt(px);
 });
 
 document.getElementById('bubbleLinkBtn').addEventListener('click', () => {
@@ -1639,10 +1640,10 @@ function applyFontControlsFromNode(node, useCommandValue) {
     bubbleFontNameEl.value = clean;
   }
 
-  const size = parseInt(computed.fontSize, 10);
-  if (size) {
-    fontSizeInput.value = size;
-    document.getElementById('bubbleFontSize').value = size;
+  const sizePt = Math.round(parseFloat(computed.fontSize) * 0.75);
+  if (sizePt) {
+    fontSizeInput.value = sizePt;
+    document.getElementById('bubbleFontSize').value = sizePt;
   }
 }
 

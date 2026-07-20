@@ -1,7 +1,7 @@
 {
   "name": "litera",
   "productName": "Литера",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Текстовый редактор с богатым форматированием и проверкой орфографии (RU/EN)",
   "main": "main.js",
   "author": "Максим",
@@ -31,6 +31,7 @@
       "index.html",
       "renderer.js",
       "styles.css",
+      "fonts/**/*",
       "node_modules/**/*"
     ],
     "directories": {
@@ -41,7 +42,9 @@
       "target": [
         {
           "target": "nsis-web",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "build/icon.ico"

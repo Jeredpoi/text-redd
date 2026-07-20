@@ -548,7 +548,7 @@ function prepareHtmlForExport(html) {
       if (face) styles.push(`font-family: ${face[1]}`);
       const size = attrs.match(/size="([^"]*)"/i);
       if (size) {
-        const map = { 1: '8px', 2: '10px', 3: '12px', 4: '14px', 5: '18px', 6: '24px', 7: '32px' };
+        const map = { 1: '8pt', 2: '10pt', 3: '12pt', 4: '14pt', 5: '18pt', 6: '24pt', 7: '36pt' };
         if (map[size[1]]) styles.push(`font-size: ${map[size[1]]}`);
       }
       return styles.length ? `<span style="${styles.join('; ')};">` : '<span>';
