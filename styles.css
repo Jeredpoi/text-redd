@@ -446,9 +446,185 @@ button, input, select { font-family: inherit; }
   cursor: text;
 }
 
-#fontName { width: 130px; }
-#fontSize { width: 76px; padding: 0 6px; }
 #lineSpacing { width: 108px; }
+
+/* ---- Кастомные выпадающие списки (шрифт, размер) ---- */
+
+.combo { position: relative; display: inline-flex; align-items: center; }
+
+.font-combo select { display: none; }
+
+.combo-trigger {
+  height: 32px;
+  min-width: 148px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+  background: var(--input-bg);
+  color: var(--text);
+  font-size: 13px;
+  padding: 0 10px;
+  cursor: pointer;
+}
+
+.combo-trigger:hover { background: var(--btn-hover); }
+
+.combo-trigger-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.combo-caret {
+  width: 10px;
+  height: 6px;
+  flex: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  fill: none;
+  opacity: .6;
+}
+
+.size-combo #fontSize,
+.size-combo #bubbleFontSize {
+  width: 56px;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.combo-caret-btn {
+  height: 32px;
+  width: 20px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--input-border);
+  border-left: none;
+  border-top-right-radius: 10px;
+  border-bottom-right-radius: 10px;
+  background: var(--input-bg);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.combo-caret-btn:hover { background: var(--btn-hover); }
+
+.combo-dropdown {
+  position: absolute;
+  top: 36px;
+  left: 0;
+  z-index: 55;
+  background: var(--modal-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  padding: 6px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.combo-dropdown.hidden { display: none; }
+
+.font-combo-dropdown { min-width: 260px; }
+.size-combo .combo-dropdown { min-width: 64px; max-height: 320px; }
+
+.combo-search {
+  width: 100%;
+  height: 30px;
+  box-sizing: border-box;
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  padding: 0 10px;
+  margin-bottom: 6px;
+  position: sticky;
+  top: 0;
+}
+
+.combo-list-section-title {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  padding: 7px 8px 4px;
+}
+
+.combo-option {
+  padding: 7px 10px;
+  border-radius: 7px;
+  font-size: 14.5px;
+  cursor: pointer;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.size-combo .combo-option { text-align: center; }
+
+.combo-option:hover,
+.combo-option.highlighted {
+  background: var(--btn-hover);
+}
+
+.combo-option.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.combo-empty {
+  padding: 10px 8px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+/* ---- Плавающая карточка ссылки ---- */
+
+.link-chip {
+  position: fixed;
+  z-index: 46;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--modal-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  padding: 6px 8px;
+  font-size: 12.5px;
+}
+
+.link-chip.hidden { display: none; }
+
+.link-chip-url {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--accent);
+  margin-right: 4px;
+}
+
+.link-chip button {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  border-radius: 6px;
+  padding: 4px 7px;
+  cursor: pointer;
+}
+
+.link-chip button:hover {
+  background: var(--btn-hover);
+  color: var(--text);
+}
 
 .sep {
   width: 1px;
@@ -923,6 +1099,15 @@ body[data-page-width="wide"] #page { max-width: 96%; }
 
 #editor a {
   color: var(--accent);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* Пока фокус в поиске комбобокса шрифта/размера, нативное выделение браузера
+   сворачивается — этот класс имитирует подсветку выделения во время
+   live-предпросмотра, чтобы текст не выглядел «снятым» с выделения. */
+.preview-highlight {
+  background-color: rgba(66, 133, 244, 0.35);
 }
 
 /* ---- Floating bubble toolbar ---- */
@@ -993,6 +1178,42 @@ body[data-page-width="wide"] #page { max-width: 96%; }
   font-size: 12.5px;
   padding: 0 6px;
   outline: none;
+}
+
+.bubble-toolbar .combo-trigger {
+  height: 28px;
+  min-width: 110px;
+  border: none;
+  border-radius: 8px;
+  background: oklch(30% .008 90);
+  color: #fff;
+  font-size: 12.5px;
+}
+
+.bubble-toolbar .combo-trigger:hover { background: oklch(36% .008 90); }
+
+.bubble-toolbar .size-combo #bubbleFontSize {
+  height: 28px;
+  width: 40px;
+  border: none;
+  border-radius: 8px 0 0 8px;
+  background: oklch(30% .008 90);
+  color: #fff;
+}
+
+.bubble-toolbar .combo-caret-btn {
+  height: 28px;
+  border: none;
+  border-radius: 0 8px 8px 0;
+  background: oklch(30% .008 90);
+  color: #fff;
+}
+
+.bubble-toolbar .combo-caret-btn:hover { background: oklch(36% .008 90); }
+
+.bubble-toolbar .combo-dropdown {
+  top: 32px;
+  color: var(--text);
 }
 
 /* Дропдауны палитры внутри всплывающей панели открываются вниз от неё */

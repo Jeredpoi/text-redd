@@ -172,6 +172,12 @@ function readVersion(filePath, ts) {
 ipcMain.handle('list-versions', (event, filePath) => listVersions(filePath));
 ipcMain.handle('read-version', (event, filePath, ts) => readVersion(filePath, ts));
 
+ipcMain.handle('open-external', (event, url) => {
+  if (/^https?:\/\//i.test(url) || /^mailto:/i.test(url)) {
+    shell.openExternal(url);
+  }
+});
+
 // ---- Вспомогательное для файловых имён ----
 
 function sanitizeFileName(name) {

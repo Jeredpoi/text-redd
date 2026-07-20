@@ -96,6 +96,7 @@
       </div>
 
       <div id="ribbon-format" class="ribbon-panel active">
+        <div class="combo font-combo" data-combo-wrap>
         <select id="fontName" title="Шрифт">
           <option value="Alegreya">Alegreya</option>
           <option value="Amatic SC">Amatic SC</option>
@@ -144,25 +145,24 @@
           <option value="Verdana">Verdana</option>
           <option value="Yeseva One">Yeseva One</option>
         </select>
-        <input type="number" id="fontSize" list="fontSizePresets" min="1" max="400" value="12" title="Размер шрифта" />
-        <datalist id="fontSizePresets">
-          <option value="8"></option>
-          <option value="9"></option>
-          <option value="10"></option>
-          <option value="11"></option>
-          <option value="12"></option>
-          <option value="14"></option>
-          <option value="16"></option>
-          <option value="18"></option>
-          <option value="20"></option>
-          <option value="22"></option>
-          <option value="24"></option>
-          <option value="26"></option>
-          <option value="28"></option>
-          <option value="36"></option>
-          <option value="48"></option>
-          <option value="72"></option>
-        </datalist>
+        <button type="button" class="combo-trigger font-combo-trigger" id="fontNameTrigger">
+          <span class="combo-trigger-label" id="fontNameLabel">Calibri</span>
+          <svg class="combo-caret" viewBox="0 0 10 6"><path d="M1 1l4 4 4-4"/></svg>
+        </button>
+        <div class="combo-dropdown font-combo-dropdown hidden" id="fontNameDropdown">
+          <input type="text" class="combo-search" id="fontNameSearch" placeholder="Поиск шрифта…" />
+          <div class="combo-list" id="fontNameList"></div>
+        </div>
+        </div>
+        <div class="combo size-combo" data-combo-wrap>
+          <input type="number" id="fontSize" min="1" max="400" value="12" title="Размер шрифта" />
+          <button type="button" class="combo-caret-btn" id="fontSizeCaretBtn" title="Список размеров">
+            <svg class="combo-caret" viewBox="0 0 10 6"><path d="M1 1l4 4 4-4"/></svg>
+          </button>
+          <div class="combo-dropdown hidden" id="fontSizeDropdown">
+            <div class="combo-list" id="fontSizeList"></div>
+          </div>
+        </div>
         <span class="sep"></span>
         <select id="blockFormat" title="Стиль абзаца">
           <option value="p">Обычный текст</option>
@@ -190,6 +190,7 @@
           <option value="1.15">1,15</option>
           <option value="1.5">1,5</option>
           <option value="2">Двойной</option>
+          <option value="custom">Другой…</option>
         </select>
         <span class="sep"></span>
         <div class="color-trigger-wrap" data-color-wrap>
@@ -378,9 +379,34 @@
         <div id="imgResizeHandle" title="Потяните, чтобы изменить размер"></div>
       </div>
 
+      <div id="linkChip" class="link-chip hidden">
+        <span id="linkChipUrl" class="link-chip-url"></span>
+        <button type="button" id="linkChipOpenBtn" title="Открыть ссылку">Открыть ↗</button>
+        <button type="button" id="linkChipEditBtn" title="Изменить ссылку">✎</button>
+        <button type="button" id="linkChipRemoveBtn" title="Удалить ссылку">✕</button>
+      </div>
+
       <div id="bubbleToolbar" class="bubble-toolbar hidden">
+        <div class="combo font-combo" data-combo-wrap>
         <select id="bubbleFontName" title="Шрифт"></select>
-        <input type="number" id="bubbleFontSize" list="fontSizePresets" min="1" max="400" title="Размер шрифта" />
+        <button type="button" class="combo-trigger font-combo-trigger" id="bubbleFontNameTrigger">
+          <span class="combo-trigger-label" id="bubbleFontNameLabel">Calibri</span>
+          <svg class="combo-caret" viewBox="0 0 10 6"><path d="M1 1l4 4 4-4"/></svg>
+        </button>
+        <div class="combo-dropdown font-combo-dropdown hidden" id="bubbleFontNameDropdown">
+          <input type="text" class="combo-search" id="bubbleFontNameSearch" placeholder="Поиск шрифта…" />
+          <div class="combo-list" id="bubbleFontNameList"></div>
+        </div>
+        </div>
+        <div class="combo size-combo" data-combo-wrap>
+          <input type="number" id="bubbleFontSize" min="1" max="400" title="Размер шрифта" />
+          <button type="button" class="combo-caret-btn" id="bubbleFontSizeCaretBtn" title="Список размеров">
+            <svg class="combo-caret" viewBox="0 0 10 6"><path d="M1 1l4 4 4-4"/></svg>
+          </button>
+          <div class="combo-dropdown hidden" id="bubbleFontSizeDropdown">
+            <div class="combo-list" id="bubbleFontSizeList"></div>
+          </div>
+        </div>
         <span class="bubble-sep"></span>
         <button data-cmd="bold" title="Жирный"><b>Ж</b></button>
         <button data-cmd="italic" title="Курсив"><i>К</i></button>
@@ -430,6 +456,19 @@
       <div class="modal-actions">
         <button id="tableCancelBtn" class="btn-secondary">Отмена</button>
         <button id="tableOkBtn" class="btn-primary">Вставить</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="lineSpacingModal" class="modal-overlay hidden">
+    <div class="modal">
+      <h3>Свой интервал</h3>
+      <label class="modal-field">Множитель (например, 1.75)
+        <input type="number" id="lineSpacingCustomInput" min="0.5" max="5" step="0.05" value="1" />
+      </label>
+      <div class="modal-actions">
+        <button id="lineSpacingCancelBtn" class="btn-secondary">Отмена</button>
+        <button id="lineSpacingOkBtn" class="btn-primary">Применить</button>
       </div>
     </div>
   </div>
@@ -552,7 +591,7 @@
           <select id="settingsFontName"></select>
         </label>
         <label class="settings-row">Размер по умолчанию
-          <input type="number" id="settingsFontSize" list="fontSizePresets" min="1" max="400" />
+          <input type="number" id="settingsFontSize" min="1" max="400" />
         </label>
         <label class="settings-row">Ширина страницы
           <select id="settingsPageWidth">

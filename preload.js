@@ -34,6 +34,7 @@ contextBridge.exposeInMainWorld('api', {
 
   listVersions: (filePath) => ipcRenderer.invoke('list-versions', filePath),
   readVersion: (filePath, ts) => ipcRenderer.invoke('read-version', filePath, ts),
+  openExternal: (url) => ipcRenderer.invoke('open-external', url),
 
   autosaveTab: (data) => ipcRenderer.invoke('autosave-tab', data),
   clearRecovery: (id) => ipcRenderer.invoke('clear-recovery', id),

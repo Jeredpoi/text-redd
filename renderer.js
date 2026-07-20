@@ -118,9 +118,9 @@ function applyDefaultFont() {
   editor.style.fontFamily = settings.defaultFontName;
   // Размеры считаем в пунктах, как в Word: 12 пт = 16 px
   editor.style.fontSize = `${settings.defaultFontSize || 12}pt`;
-  document.getElementById('fontName').value = settings.defaultFontName;
-  document.getElementById('bubbleFontName').value = settings.defaultFontName;
-  document.getElementById('fontSize').value = settings.defaultFontSize || 15;
+  setFontNameEverywhere(settings.defaultFontName);
+  document.getElementById('fontSize').value = settings.defaultFontSize || 12;
+  document.getElementById('bubbleFontSize').value = settings.defaultFontSize || 12;
 }
 
 let dragTabId = null;
@@ -977,7 +977,7 @@ document.querySelectorAll('[data-cmd]').forEach((btn) => {
 // restored (verified empirically — restoring focus/selection is not enough).
 // So for these controls we bypass execCommand and apply the style directly
 // to the saved range by walking its text nodes and wrapping each in a span.
-function applyInlineStyleToRange(range, applyStyle) {
+function applyInlineStyleToRange(range, applyStyle, tagName) {
   if (!range || range.collapsed) return false;
   const root = range.commonAncestorContainer.nodeType === 3
     ? range.commonAncestorContainer.parentNode
@@ -989,6 +989,9 @@ function applyInlineStyleToRange(range, applyStyle) {
   let n;
   while ((n = walker.nextNode())) nodes.push(n);
   let applied = false;
+  let firstSpan = null;
+  let lastSpan = null;
+  const spans = [];
   nodes.forEach((textNode) => {
     let start = 0;
     let end = textNode.length;
@@ -1000,7 +1003,7 @@ function applyInlineStyleToRange(range, applyStyle) {
     const middle = full.slice(start, end);
     const after = full.slice(end);
     if (!middle) return;
-    const span = document.createElement('span');
+    const span = document.createElement(tagName || 'span');
     applyStyle(span);
     span.textContent = middle;
     const frag = document.createDocumentFragment();
@@ -1009,8 +1012,35 @@ function applyInlineStyleToRange(range, applyStyle) {
     if (after) frag.appendChild(document.createTextNode(after));
     textNode.parentNode.replaceChild(frag, textNode);
     applied = true;
+    if (!firstSpan) firstSpan = span;
+    lastSpan = span;
+    spans.push(span);
   });
-  return applied;
+  // Раньше выделение после применения стиля пропадало (Range указывал на
+  // уже удалённые текстовые узлы) — теперь явно переставляем его на новые
+  // span'ы, чтобы выделение оставалось видимым, как в Word.
+  if (applied) {
+    const sel = window.getSelection();
+    const newRange = document.createRange();
+    newRange.setStart(firstSpan.firstChild, 0);
+    newRange.setEnd(lastSpan.firstChild, lastSpan.firstChild.length);
+    sel.removeAllRanges();
+    sel.addRange(newRange);
+  }
+  return applied ? { firstSpan, lastSpan, spans } : false;
+}
+
+// Пока фокус живёт в поле поиска/размера комбобокса (иначе он бы «крал»
+// фокус у выпадающего списка), нативное выделение браузера сворачивается —
+// поэтому во время предпросмотра подсвечиваем сами span'ы вручную классом,
+// имитируя вид выделения независимо от того, где сейчас фокус.
+function markPreviewHighlight(spans) {
+  clearPreviewHighlight();
+  if (spans) spans.forEach((s) => s.classList.add('preview-highlight'));
+}
+
+function clearPreviewHighlight() {
+  editor.querySelectorAll('.preview-highlight').forEach((el) => el.classList.remove('preview-highlight'));
 }
 
 // Когда выделения нет (просто мигает курсор), выделять нечего — вместо этого
@@ -1052,6 +1082,289 @@ function applyTextStyle(applyStyle) {
   scheduleAutosave();
 }
 
+// ---- Предпросмотр при наведении (как в Word): наводишь на шрифт/размер в
+// выпадающем списке — применяется сразу же к выделению, не наведёшь — при
+// закрытии списка без выбора возвращается исходный текст. Реализовано через
+// снимок editor.innerHTML на момент открытия списка + плоские текстовые
+// смещения выделения (устойчивы к повторным откатам, в отличие от Range,
+// который «умирает» при первой же замене узлов).
+
+let previewBaselineHtml = null;
+let previewOffsets = null;
+
+function rangeToOffsets(range) {
+  if (!range || range.collapsed) return null;
+  const pre = document.createRange();
+  pre.selectNodeContents(editor);
+  pre.setEnd(range.startContainer, range.startOffset);
+  const start = pre.toString().length;
+  const end = start + range.toString().length;
+  return end > start ? { start, end } : null;
+}
+
+function offsetsToRange(offsets) {
+  if (!offsets) return null;
+  const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
+  let node;
+  let pos = 0;
+  let startNode;
+  let startOffset;
+  let endNode;
+  let endOffset;
+  while ((node = walker.nextNode())) {
+    const len = node.textContent.length;
+    if (startNode === undefined && pos + len >= offsets.start) {
+      startNode = node;
+      startOffset = offsets.start - pos;
+    }
+    if (pos + len >= offsets.end) {
+      endNode = node;
+      endOffset = offsets.end - pos;
+      break;
+    }
+    pos += len;
+  }
+  if (startNode === undefined || endNode === undefined) return null;
+  const range = document.createRange();
+  range.setStart(startNode, startOffset);
+  range.setEnd(endNode, endOffset);
+  return range;
+}
+
+function beginPreviewSession() {
+  previewOffsets = rangeToOffsets(savedRange);
+  previewBaselineHtml = previewOffsets ? editor.innerHTML : null;
+}
+
+// Chromium сам переносит фокус DOM на contenteditable, как только в него
+// программно ставится Selection (побочный эффект applyInlineStyleToRange
+// внутри showPreview) — из-за этого поле поиска шрифта теряло фокус после
+// первого же наведения, и Escape/стрелки переставали до него доходить.
+// Комбобокс, который сейчас открыт, регистрирует сюда, куда возвращать
+// фокус после каждого предпросмотра.
+let activeComboRefocusEl = null;
+// И функцию закрытия — чтобы Escape работал даже если фокус улетел в
+// редактор и обработчик keydown на самом поле поиска не сработает.
+let openComboCloseFn = null;
+
+function showPreview(applyStyle) {
+  if (previewBaselineHtml === null || !previewOffsets) return;
+  editor.innerHTML = previewBaselineHtml;
+  const range = offsetsToRange(previewOffsets);
+  let result = false;
+  if (range) result = applyInlineStyleToRange(range, applyStyle);
+  if (activeComboRefocusEl) activeComboRefocusEl.focus();
+  markPreviewHighlight(result ? result.spans : null);
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && openComboCloseFn) {
+    e.preventDefault();
+    e.stopPropagation();
+    const fn = openComboCloseFn;
+    openComboCloseFn = null;
+    fn();
+    editor.focus();
+  }
+}, true);
+
+function endPreviewSession(commitApplyStyle) {
+  clearPreviewHighlight();
+  if (previewBaselineHtml === null) {
+    // Предпросмотра не было (курсор без выделения) — обычное применение
+    // «стиль для нового текста».
+    if (commitApplyStyle) applyTextStyle(commitApplyStyle);
+    return;
+  }
+  editor.innerHTML = previewBaselineHtml;
+  const range = offsetsToRange(previewOffsets);
+  if (commitApplyStyle && range) {
+    savedRange = range;
+    applyTextStyle(commitApplyStyle);
+  } else if (range) {
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+  previewBaselineHtml = null;
+  previewOffsets = null;
+}
+
+// ---- Список шрифтов: сортировка по популярности + недавние ----
+
+const RECENT_FONTS_KEY = 'litera-recent-fonts';
+// Самые узнаваемые/часто используемые шрифты — сверху, как в Word.
+const FONT_POPULARITY = [
+  'Calibri', 'Arial', 'Times New Roman', 'Georgia', 'Verdana', 'Comic Sans MS',
+  'Courier New', 'Trebuchet MS', 'Impact', 'Roboto', 'Open Sans', 'Montserrat',
+  'Lora', 'Merriweather', 'PT Sans', 'PT Serif',
+];
+
+function loadRecentFonts() {
+  try {
+    const list = JSON.parse(localStorage.getItem(RECENT_FONTS_KEY));
+    return Array.isArray(list) ? list : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function addRecentFont(name) {
+  const list = [name, ...loadRecentFonts().filter((f) => f !== name)].slice(0, 5);
+  try {
+    localStorage.setItem(RECENT_FONTS_KEY, JSON.stringify(list));
+  } catch (e) {}
+}
+
+function sortedFontNames(allNames) {
+  const rank = new Map(FONT_POPULARITY.map((f, i) => [f, i]));
+  return [...allNames].sort((a, b) => {
+    const ra = rank.has(a) ? rank.get(a) : FONT_POPULARITY.length + allNames.indexOf(a);
+    const rb = rank.has(b) ? rank.get(b) : FONT_POPULARITY.length + allNames.indexOf(b);
+    return ra - rb;
+  });
+}
+
+// ---- Универсальный кастомный выпадающий список для шрифта ----
+
+function setupFontCombo({ selectId, triggerId, labelId, dropdownId, searchId, listId }) {
+  const selectEl = document.getElementById(selectId);
+  const triggerEl = document.getElementById(triggerId);
+  const labelEl = document.getElementById(labelId);
+  const dropdownEl = document.getElementById(dropdownId);
+  const searchEl = document.getElementById(searchId);
+  const listEl = document.getElementById(listId);
+  const allNames = Array.from(selectEl.options).map((o) => o.value);
+  const sortedAll = sortedFontNames(allNames);
+  let highlightedIdx = -1;
+  let visibleOptions = [];
+
+  function setValue(value, { commit }) {
+    selectEl.value = value;
+    labelEl.textContent = value;
+    labelEl.style.fontFamily = `'${value}'`;
+    if (commit) addRecentFont(value);
+  }
+
+  function renderList(filterText) {
+    listEl.innerHTML = '';
+    visibleOptions = [];
+    highlightedIdx = -1;
+    const q = (filterText || '').trim().toLowerCase();
+
+    function addOption(name) {
+      const opt = document.createElement('div');
+      opt.className = 'combo-option' + (name === selectEl.value ? ' active' : '');
+      opt.textContent = name;
+      opt.style.fontFamily = `'${name}'`;
+      opt.dataset.value = name;
+      opt.addEventListener('mouseenter', () => {
+        highlightedIdx = visibleOptions.indexOf(name);
+        showPreview((span) => { span.style.fontFamily = name; });
+      });
+      opt.addEventListener('mousedown', (e) => e.preventDefault());
+      opt.addEventListener('click', () => {
+        setValue(name, { commit: true });
+        endPreviewSession((span) => { span.style.fontFamily = name; });
+        closeDropdown();
+      });
+      listEl.appendChild(opt);
+      visibleOptions.push(name);
+    }
+
+    if (q) {
+      const filtered = sortedAll.filter((n) => n.toLowerCase().includes(q));
+      if (filtered.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'combo-empty';
+        empty.textContent = 'Ничего не найдено';
+        listEl.appendChild(empty);
+      } else {
+        filtered.forEach(addOption);
+      }
+      return;
+    }
+
+    const recent = loadRecentFonts().filter((f) => allNames.includes(f));
+    if (recent.length > 0) {
+      const title = document.createElement('div');
+      title.className = 'combo-list-section-title';
+      title.textContent = 'Недавние';
+      listEl.appendChild(title);
+      recent.forEach(addOption);
+      const allTitle = document.createElement('div');
+      allTitle.className = 'combo-list-section-title';
+      allTitle.textContent = 'Все шрифты';
+      listEl.appendChild(allTitle);
+    }
+    sortedAll.forEach(addOption);
+  }
+
+  function openDropdown() {
+    saveSelection();
+    beginPreviewSession();
+    searchEl.value = '';
+    renderList('');
+    dropdownEl.classList.remove('hidden');
+    searchEl.focus();
+    activeComboRefocusEl = searchEl;
+    openComboCloseFn = () => closeDropdown(true);
+    const active = listEl.querySelector('.combo-option.active');
+    if (active) active.scrollIntoView({ block: 'nearest' });
+  }
+
+  function closeDropdown(cancel) {
+    if (cancel) endPreviewSession(null);
+    dropdownEl.classList.add('hidden');
+    if (activeComboRefocusEl === searchEl) activeComboRefocusEl = null;
+    if (openComboCloseFn) openComboCloseFn = null;
+  }
+
+  triggerEl.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const willOpen = dropdownEl.classList.contains('hidden');
+    if (!dropdownEl.classList.contains('hidden')) closeDropdown(true);
+    if (willOpen) openDropdown();
+  });
+
+  searchEl.addEventListener('input', () => renderList(searchEl.value));
+
+  searchEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeDropdown(true);
+      editor.focus();
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const opts = listEl.querySelectorAll('.combo-option');
+      if (opts.length === 0) return;
+      highlightedIdx = (highlightedIdx + (e.key === 'ArrowDown' ? 1 : -1) + opts.length) % opts.length;
+      opts.forEach((o) => o.classList.remove('highlighted'));
+      const el = opts[highlightedIdx];
+      el.classList.add('highlighted');
+      el.scrollIntoView({ block: 'nearest' });
+      showPreview((span) => { span.style.fontFamily = el.dataset.value; });
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const opts = listEl.querySelectorAll('.combo-option');
+      const el = opts[highlightedIdx] || opts[0];
+      if (el) {
+        setValue(el.dataset.value, { commit: true });
+        endPreviewSession((span) => { span.style.fontFamily = el.dataset.value; });
+        closeDropdown();
+      }
+    }
+  });
+
+  document.addEventListener('mousedown', (e) => {
+    if (!dropdownEl.classList.contains('hidden') && !e.target.closest(`#${dropdownId}`) && !e.target.closest(`#${triggerId}`)) {
+      closeDropdown(true);
+    }
+  });
+
+  return { setValue };
+}
+
 const fontNameSelectEl = document.getElementById('fontName');
 const bubbleFontNameEl = document.getElementById('bubbleFontName');
 // Список шрифтов во всплывающей панели — копия основного из ленты.
@@ -1059,20 +1372,80 @@ Array.from(fontNameSelectEl.options).forEach((o) => {
   bubbleFontNameEl.appendChild(new Option(o.text, o.value));
 });
 
-function onFontNameChange(e) {
-  const value = e.target.value;
-  fontNameSelectEl.value = value;
-  bubbleFontNameEl.value = value;
-  applyTextStyle((span) => { span.style.fontFamily = value; });
+const fontNameCombo = setupFontCombo({
+  selectId: 'fontName', triggerId: 'fontNameTrigger', labelId: 'fontNameLabel',
+  dropdownId: 'fontNameDropdown', searchId: 'fontNameSearch', listId: 'fontNameList',
+});
+const bubbleFontNameCombo = setupFontCombo({
+  selectId: 'bubbleFontName', triggerId: 'bubbleFontNameTrigger', labelId: 'bubbleFontNameLabel',
+  dropdownId: 'bubbleFontNameDropdown', searchId: 'bubbleFontNameSearch', listId: 'bubbleFontNameList',
+});
+
+function setFontNameEverywhere(value) {
+  fontNameCombo.setValue(value, { commit: false });
+  bubbleFontNameCombo.setValue(value, { commit: false });
 }
 
-// mousedown — для мыши; focus — для клавиатурной навигации (Tab + стрелки).
-fontNameSelectEl.addEventListener('mousedown', saveSelection);
-fontNameSelectEl.addEventListener('focus', saveSelection);
-fontNameSelectEl.addEventListener('change', onFontNameChange);
-bubbleFontNameEl.addEventListener('mousedown', saveSelection);
-bubbleFontNameEl.addEventListener('focus', saveSelection);
-bubbleFontNameEl.addEventListener('change', onFontNameChange);
+// ---- Универсальный кастомный выпадающий список для размера ----
+
+const FONT_SIZE_PRESETS = [8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72];
+
+function setupSizeCombo({ inputId, caretId, dropdownId, listId }) {
+  const inputEl = document.getElementById(inputId);
+  const caretEl = document.getElementById(caretId);
+  const dropdownEl = document.getElementById(dropdownId);
+  const listEl = document.getElementById(listId);
+
+  function renderList() {
+    listEl.innerHTML = '';
+    const current = parseInt(inputEl.value, 10);
+    FONT_SIZE_PRESETS.forEach((pt) => {
+      const opt = document.createElement('div');
+      opt.className = 'combo-option' + (pt === current ? ' active' : '');
+      opt.textContent = String(pt);
+      opt.addEventListener('mouseenter', () => {
+        showPreview((span) => { span.style.fontSize = `${pt}pt`; });
+      });
+      opt.addEventListener('mousedown', (e) => e.preventDefault());
+      opt.addEventListener('click', () => {
+        inputEl.value = pt;
+        endPreviewSession((span) => { span.style.fontSize = `${pt}pt`; });
+        updateStats();
+        closeDropdown();
+      });
+      listEl.appendChild(opt);
+    });
+  }
+
+  function openDropdown() {
+    saveSelection();
+    beginPreviewSession();
+    renderList();
+    dropdownEl.classList.remove('hidden');
+    activeComboRefocusEl = inputEl;
+    openComboCloseFn = () => closeDropdown(true);
+  }
+
+  function closeDropdown(cancel) {
+    if (cancel) endPreviewSession(null);
+    dropdownEl.classList.add('hidden');
+    if (activeComboRefocusEl === inputEl) activeComboRefocusEl = null;
+    if (openComboCloseFn) openComboCloseFn = null;
+  }
+
+  caretEl.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const willOpen = dropdownEl.classList.contains('hidden');
+    if (!dropdownEl.classList.contains('hidden')) closeDropdown(true);
+    if (willOpen) openDropdown();
+  });
+
+  document.addEventListener('mousedown', (e) => {
+    if (!dropdownEl.classList.contains('hidden') && !e.target.closest(`#${dropdownId}`) && !e.target.closest(`#${caretId}`)) {
+      closeDropdown(true);
+    }
+  });
+}
 
 function setFontSizePt(pt) {
   applyTextStyle((span) => { span.style.fontSize = `${pt}pt`; });
@@ -1086,6 +1459,9 @@ fontSizeInputEl.addEventListener('change', (e) => {
   e.target.value = px;
   setFontSizePt(px);
 });
+
+setupSizeCombo({ inputId: 'fontSize', caretId: 'fontSizeCaretBtn', dropdownId: 'fontSizeDropdown', listId: 'fontSizeList' });
+setupSizeCombo({ inputId: 'bubbleFontSize', caretId: 'bubbleFontSizeCaretBtn', dropdownId: 'bubbleFontSizeDropdown', listId: 'bubbleFontSizeList' });
 
 const blockFormatEl = document.getElementById('blockFormat');
 blockFormatEl.addEventListener('mousedown', saveSelection);
@@ -1125,12 +1501,7 @@ function blocksInRange(range) {
   return [...blocks];
 }
 
-const lineSpacingEl = document.getElementById('lineSpacing');
-lineSpacingEl.addEventListener('mousedown', saveSelection);
-lineSpacingEl.addEventListener('focus', saveSelection);
-lineSpacingEl.addEventListener('change', (e) => {
-  const value = e.target.value;
-  if (!value) return;
+function applyLineSpacing(value) {
   let range = savedRange;
   if (!range) {
     const sel = window.getSelection();
@@ -1143,10 +1514,46 @@ lineSpacingEl.addEventListener('change', (e) => {
     editor.style.lineHeight = value;
   }
   editor.focus();
-  e.target.selectedIndex = 0;
   markActiveDirty();
   scheduleAutosave();
+}
+
+const lineSpacingEl = document.getElementById('lineSpacing');
+const lineSpacingModal = document.getElementById('lineSpacingModal');
+const lineSpacingCustomInput = document.getElementById('lineSpacingCustomInput');
+const lineSpacingOkBtn = document.getElementById('lineSpacingOkBtn');
+const lineSpacingCancelBtn = document.getElementById('lineSpacingCancelBtn');
+
+lineSpacingEl.addEventListener('mousedown', saveSelection);
+lineSpacingEl.addEventListener('focus', saveSelection);
+lineSpacingEl.addEventListener('change', (e) => {
+  const value = e.target.value;
+  if (!value) return;
+  if (value === 'custom') {
+    // savedRange уже держит правильное выделение (захвачено на mousedown/
+    // focus самого select до того, как он увёл фокус) — openModal() внутри
+    // тоже вызывает saveSelection(), но в этот момент живое выделение уже
+    // может быть недостоверным, поэтому сохраняем и восстанавливаем сами.
+    const captured = savedRange;
+    lineSpacingCustomInput.value = '1.75';
+    openModal(lineSpacingModal);
+    savedRange = captured;
+    lineSpacingCustomInput.focus();
+    lineSpacingCustomInput.select();
+  } else {
+    applyLineSpacing(value);
+  }
+  e.target.selectedIndex = 0;
 });
+
+lineSpacingCancelBtn.addEventListener('click', () => closeModal(lineSpacingModal));
+lineSpacingOkBtn.addEventListener('click', () => {
+  const value = Math.max(0.5, Math.min(5, parseFloat(lineSpacingCustomInput.value) || 1));
+  closeModal(lineSpacingModal);
+  restoreSelection();
+  applyLineSpacing(String(value));
+});
+wireModalKeys(lineSpacingModal, lineSpacingOkBtn, lineSpacingCancelBtn);
 
 // ---- Чек-лист (как в Google Docs) ----
 
@@ -1635,9 +2042,9 @@ function applyFontControlsFromNode(node, useCommandValue) {
   if (!clean) {
     clean = (computed.fontFamily || '').split(',')[0].replace(/^["']|["']$/g, '').trim();
   }
-  if (clean && [...fontNameSelect.options].some((o) => o.value.toLowerCase() === clean.toLowerCase())) {
-    fontNameSelect.value = clean;
-    bubbleFontNameEl.value = clean;
+  const matchedOption = clean && [...fontNameSelect.options].find((o) => o.value.toLowerCase() === clean.toLowerCase());
+  if (matchedOption) {
+    setFontNameEverywhere(matchedOption.value);
   }
 
   const sizePt = Math.round(parseFloat(computed.fontSize) * 0.75);
@@ -1924,14 +2331,108 @@ document.getElementById('btnLink').addEventListener('click', () => {
 
 window.api.onTriggerInsertLink(() => document.getElementById('btnLink').click());
 
-linkCancelBtn.addEventListener('click', () => closeModal(linkModal));
+let editingLinkEl = null;
+
+linkCancelBtn.addEventListener('click', () => {
+  closeModal(linkModal);
+  editingLinkEl = null;
+});
 
 linkOkBtn.addEventListener('click', () => {
   const url = linkUrlInput.value.trim();
   closeModal(linkModal);
-  if (!url) return;
-  restoreSelection();
-  document.execCommand('createLink', false, url);
+  if (!url) { editingLinkEl = null; return; }
+  if (editingLinkEl) {
+    editingLinkEl.setAttribute('href', url);
+    editingLinkEl = null;
+    editor.focus();
+    markActiveDirty();
+    scheduleAutosave();
+    return;
+  }
+  // Модальное окно — это нативный <input>, а фокус на нём ломает
+  // execCommand так же, как и у ленты (см. applyInlineStyleToRange) —
+  // поэтому создаём <a> вручную, а не через createLink.
+  const applied = applyInlineStyleToRange(savedRange, (a) => { a.href = url; }, 'a');
+  editor.focus();
+  if (!applied) document.execCommand('createLink', false, url);
+  markActiveDirty();
+  scheduleAutosave();
+});
+
+// ---- Наведение на ссылку: карточка «Открыть / Изменить / Удалить» ----
+
+const linkChip = document.getElementById('linkChip');
+const linkChipUrlEl = document.getElementById('linkChipUrl');
+const linkChipOpenBtn = document.getElementById('linkChipOpenBtn');
+const linkChipEditBtn = document.getElementById('linkChipEditBtn');
+const linkChipRemoveBtn = document.getElementById('linkChipRemoveBtn');
+let hoveredLink = null;
+let linkChipHideTimer = null;
+
+function showLinkChip(a) {
+  clearTimeout(linkChipHideTimer);
+  hoveredLink = a;
+  linkChipUrlEl.textContent = a.getAttribute('href') || '';
+  const r = a.getBoundingClientRect();
+  linkChip.classList.remove('hidden');
+  const chipRect = linkChip.getBoundingClientRect();
+  linkChip.style.top = `${r.bottom + 6}px`;
+  linkChip.style.left = `${Math.min(r.left, window.innerWidth - chipRect.width - 12)}px`;
+}
+
+function scheduleHideLinkChip() {
+  clearTimeout(linkChipHideTimer);
+  linkChipHideTimer = setTimeout(() => {
+    linkChip.classList.add('hidden');
+    hoveredLink = null;
+  }, 220);
+}
+
+editor.addEventListener('mouseover', (e) => {
+  const a = e.target.closest && e.target.closest('a');
+  if (a && editor.contains(a)) showLinkChip(a);
+});
+editor.addEventListener('mouseout', (e) => {
+  const a = e.target.closest && e.target.closest('a');
+  if (a && !e.relatedTarget?.closest?.('.link-chip')) scheduleHideLinkChip();
+});
+linkChip.addEventListener('mouseenter', () => clearTimeout(linkChipHideTimer));
+linkChip.addEventListener('mouseleave', scheduleHideLinkChip);
+
+// Ctrl+клик по ссылке открывает её сразу, без наведения на карточку.
+editor.addEventListener('click', (e) => {
+  const a = e.target.closest && e.target.closest('a');
+  if (a && editor.contains(a) && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    window.api.openExternal(a.getAttribute('href'));
+  }
+});
+
+linkChipOpenBtn.addEventListener('click', () => {
+  if (hoveredLink) window.api.openExternal(hoveredLink.getAttribute('href'));
+});
+
+linkChipEditBtn.addEventListener('click', () => {
+  if (!hoveredLink) return;
+  const a = hoveredLink;
+  editingLinkEl = a;
+  linkUrlInput.value = a.getAttribute('href') || 'https://';
+  linkChip.classList.add('hidden');
+  openModal(linkModal);
+  linkUrlInput.focus();
+  linkUrlInput.select();
+});
+
+linkChipRemoveBtn.addEventListener('click', () => {
+  if (!hoveredLink) return;
+  const a = hoveredLink;
+  const parent = a.parentNode;
+  while (a.firstChild) parent.insertBefore(a.firstChild, a);
+  parent.removeChild(a);
+  parent.normalize();
+  linkChip.classList.add('hidden');
+  hoveredLink = null;
   markActiveDirty();
   scheduleAutosave();
 });
